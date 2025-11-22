@@ -1,4 +1,4 @@
-package dev.g4s.heatwise.es
+package dev.g4s.tess
 
 import scala.util.Try
 

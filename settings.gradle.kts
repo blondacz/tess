@@ -16,7 +16,7 @@ extensions.configure<org.ajoberstar.reckon.gradle.ReckonExtension> {
     setStageCalc(calcStageFromProp())
 }
 
-rootProject.name = "heatwise"
+rootProject.name = "tess"
 
 include(
     "app",

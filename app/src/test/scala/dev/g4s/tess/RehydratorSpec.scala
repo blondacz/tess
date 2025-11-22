@@ -1,0 +1,44 @@
+package dev.g4s.tess
+
+import org.scalatest.funsuite.AnyFunSuite
+
+class RehydratorSpec extends AnyFunSuite {
+
+  test("rehydrateNewActor should build actor from first UOW events and keep version of last UOW") {
+    val id = FirstActorId(42)
+
+    val uow1 = UnitOfWork(
+      id,
+      actorVersion = 1,
+      actorClass = classOf[FirstActor],
+      events = Seq(FirstActorCreatedEvent(1, id, "hi"), FirstActorUpdated(1, id, "hi")),
+      startingEventRank = 1
+    )
+
+    val uow2 = UnitOfWork(
+      id,
+      actorVersion = 2,
+      actorClass = classOf[FirstActor],
+      events = Seq(FirstActorUpdated(2, id, "there")),
+      startingEventRank = 3
+    )
+
+    val rehydrated = Rehydrator.rehydrateNewActor(id, List(uow1, uow2))(FirstActorFactory)
+    assert(rehydrated.nonEmpty)
+    val (actor, version) = rehydrated.get
+    assert(version == 2)
+    val fa = actor.asInstanceOf[FirstActor]
+    assert(fa.id == id)
+    assert(fa.cid == 2)
+    assert(fa.text == "there")
+  }
+
+  test("updateActor should apply events in order") {
+    val id = FirstActorId(7)
+    val initial = FirstActor(id, 0, "a")
+    val updated = Rehydrator.updateActor(initial, Seq(FirstActorUpdated(1, id, "ab"), FirstActorUpdated(2, id, "abc")))
+    val fa = updated.asInstanceOf[FirstActor]
+    assert(fa.cid == 2)
+    assert(fa.text == "abc")
+  }
+}
