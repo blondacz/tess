@@ -8,17 +8,15 @@ class RehydratorSpec extends AnyFunSuite {
     val id = FirstActorId(42)
 
     val uow1 = UnitOfWork(
-      id,
+      ActorKey(id, classOf[FirstActor]),
       actorVersion = 1,
-      actorClass = classOf[FirstActor],
       events = Seq(FirstActorCreatedEvent(1, id, "hi"), FirstActorUpdated(1, id, "hi")),
       startingEventRank = 1
     )
 
     val uow2 = UnitOfWork(
-      id,
+      ActorKey(id, classOf[FirstActor]),
       actorVersion = 2,
-      actorClass = classOf[FirstActor],
       events = Seq(FirstActorUpdated(2, id, "there")),
       startingEventRank = 3
     )

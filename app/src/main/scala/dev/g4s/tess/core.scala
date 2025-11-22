@@ -1,5 +1,6 @@
 package dev.g4s.tess
 
+import scala.reflect.{ClassTag, classTag}
 import scala.util.Try
 
 
@@ -9,21 +10,22 @@ trait Event
 trait Context
 trait Id extends Product with Serializable
 
-case class UnitOfWork(id: Id,
+case class ActorKey(id: Id, clazz: Class[? <: Actor])
+
+case class UnitOfWork(key: ActorKey,
                       actorVersion: Long,
-                      actorClass: Class[_ <: Actor],
                       events: Seq[Event],
                       startingEventRank: Long) {
   lazy val endingEventRank : Long = startingEventRank + events.size -1
   lazy val headEvent : (Option[Event],Option[UnitOfWork]) = events.headOption-> {
-    if (events.tail.isEmpty) None else Some(UnitOfWork(id, actorVersion + 1, actorClass, events.tail, endingEventRank + 1))
+    if (events.tail.isEmpty) None else Some(UnitOfWork(key, actorVersion + 1, events.tail, endingEventRank + 1))
   }
 }
 
 
 trait EventStore {
   def store(uow: UnitOfWork): Either[Throwable,Unit]
-  def load(id: Id): Either[Throwable,List[UnitOfWork]]
+  def load(key: ActorKey): Either[Throwable,List[UnitOfWork]]
   def lastEventRank : Option[Long]
 }
 
@@ -31,7 +33,7 @@ trait Coordinator {
   def eventStore: EventStore
   def commit() :  Option[Long]
   def rollback() : Unit
-  def load[AF <: ActorFactory, ID <: Id](id: ID)( actorFactory: AF { type ActorIdType = ID}): Either[Throwable,Option[(Actor,Long)]]
+  def load[AF <: ActorFactory, ID <: Id](key: ActorKey)( actorFactory: AF { type ActorIdType = ID}): Either[Throwable,Option[(Actor,Long)]]
   def lastEventRank : Option[Long]
   def store(uow: UnitOfWork, actor: Actor): Either[Throwable,Unit]
 }
@@ -44,6 +46,7 @@ trait ActorFactory {
   def route: PartialFunction[Message,List[ActorIdType]]
   def receive(id: ActorIdType): PartialFunction[Message,Event]
   def create(id: ActorIdType): PartialFunction[Event,ActorType]
+  def actorClass: Class[? <: Actor]
 }
 
 trait Actor {

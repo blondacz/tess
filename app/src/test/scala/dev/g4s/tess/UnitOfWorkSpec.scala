@@ -16,19 +16,19 @@ class UnitOfWorkSpec extends AnyFunSuite {
   }
 
   test("endingEventRank should be starting + size - 1") {
-    val uow = UnitOfWork(TestId(1), 1, classOf[TestActor], Seq(E1, E2), startingEventRank = 10)
+    val uow = UnitOfWork(ActorKey(TestId(1), classOf[TestActor]), 1, Seq(E1, E2), startingEventRank = 10)
     assert(uow.endingEventRank == 11)
   }
 
   test("headEvent should return first event and None when there is only one event") {
-    val uow = UnitOfWork(TestId(1), 1, classOf[TestActor], Seq(E1), startingEventRank = 5)
+    val uow = UnitOfWork(ActorKey(TestId(1), classOf[TestActor]), 1, Seq(E1), startingEventRank = 5)
     val (head, next) = uow.headEvent
     assert(head.contains(E1))
     assert(next.isEmpty)
   }
 
   test("headEvent should return first event and the rest as next UnitOfWork") {
-    val uow = UnitOfWork(TestId(1), 3, classOf[TestActor], Seq(E1, E2), startingEventRank = 7)
+    val uow = UnitOfWork(ActorKey(TestId(1), classOf[TestActor]), 3, Seq(E1, E2), startingEventRank = 7)
     val (head, next) = uow.headEvent
     assert(head.contains(E1))
     val nextUow = next.get

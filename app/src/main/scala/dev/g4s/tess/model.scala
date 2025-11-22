@@ -10,6 +10,7 @@ case class FirstActorUpdated(cid: Long, actorId: FirstActorId, text: String) ext
 object FirstActorFactory extends ActorFactory {
   override type ActorIdType = FirstActorId
   override type ActorType = FirstActor
+  override def actorClass: Class[? <: Actor] = classOf[FirstActor]
 
   override def route: PartialFunction[Message, List[FirstActorId]] = {
     case FirstActorMessage(_,ids,_) => ids.map(FirstActorId(_))
@@ -40,6 +41,7 @@ case class SecondActorUpdated(cid: Long, actorId: FirstActorId, text: String) ex
 object SecondActorFactory extends ActorFactory {
   override type ActorIdType = SecondActorId
   override type ActorType = SecondActor
+  override def actorClass: Class[? <: Actor] = classOf[SecondActor]
 
   override def route: PartialFunction[Message, List[SecondActorId]] = {
     case EventMessage(FirstActorCreatedEvent(_,id,_)) => SecondActorId(id.id) :: Nil
