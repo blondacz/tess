@@ -1,0 +1,44 @@
+name: ci.yml
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v3
+      - run: ./gradlew --no-daemon --info -S build
+      - name: Debug - List test results
+        if: always()
+        run: |
+          echo "Looking for test results..."
+          find . -path '*/build/test-results/test/*.xml' -type f || echo "No test results found"
+      - name: Test Report (summary)
+        uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: 'Test Report'
+          path: '**/build/test-results/test/*.xml'
+          reporter: java-junit
+          fail-on-error: true
+          use-actions-summary: true
+          only-summary: false          # set true if you want just a compact table
+          list-suites: all          # or: all | none
+          list-tests: all           # or: all | none
+          max-annotations: 10
+      - name: Render PUML with Docker
+        run: |
+          ls -la "${{ github.workspace }}/docs/content/diagrams"   # sanity check
+          docker run --rm \
+            -v "${{ github.workspace }}/docs/content/diagrams:/workspace" \
+            -w /workspace \
+            plantuml/plantuml:latest \
+            -tpng -tsvg *.puml
+      
