@@ -5,14 +5,15 @@ package dev.g4s.tess.raft.v1;
 option java_multiple_files = true;
 option java_package = "dev.g4s.tess.raft.v1";
 option java_outer_classname = "TessRaftProto";
+import "scalapb/scalapb.proto";
 
 // ==============================
 // Core Domain Types
 // ==============================
 
 message ActorKey {
+  option (scalapb.message).no_box = true;
   string actor_type = 1;
-
   int64 actor_id = 2;
 }
 
@@ -68,20 +69,11 @@ message ActorEventRecord {
 // Raft Wire Format (for gRPC) - Full Entries
 // ==============================
 
-// A full batch of events carried over the wire in AppendEntries.
-// This is what the leader sends to followers.
 message RaftLogEntryWire {
-  // Raft term in which this entry was created
   int64 term = 1;
-
-  // Raft log index of this entry
   int64 index = 2;
-
-  // Inclusive range of global event ranks covered by this entry
   int64 starting_event_rank = 3;
   int64 ending_event_rank = 4;
-
-  // All actor units touched by this message traversal
   repeated ActorUnitOfWork actor_units = 5;
 }
 
@@ -89,8 +81,8 @@ message RaftLogEntryWire {
 // RocksDB: Lightweight Log Index (raft-log CF)
 // ==============================
 //
-// After receiving RaftLogEntryWire, you can project events into the `actors` CF,
-// and store a minimal index entry in `raft-log` CF that just points at them.
+// After receiving RaftLogEntryWire, Events projected into the `actors` CF,
+// and only minimal index entry in stored `raft-log` CF that just points at them.
 
 // Pointer to a contiguous block of event ranks for one actor.
 // Matches (ActorKey, [start..end]) in  model.
