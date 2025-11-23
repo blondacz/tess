@@ -34,14 +34,6 @@ project.md
 .gradle/
 **/.kotlin/
 /ui/node_modules/
-.bloop/app-test.json
-.bloop/app.json
-.bloop/bloop.settings.json
-.bloop/docs-test.json
-.bloop/docs.json
-.metals/metals.lock.db
-.metals/metals.log
-.metals/metals.mv.db
-.metals/.reports/metals-full/2025-11-23/r_empty-definition_(app)_01-13-02-593.md
-.metals/.reports/metals-full/2025-11-23/r_empty-definition_(app)_01-16-15-512.md
+.bloop/
+.metals/
 .vscode/settings.json

@@ -7,6 +7,7 @@ plugins {
 }
 
 dependencies {
+    implementation("org.rocksdb:rocksdbjni:9.7.3")
     implementation(libs.logback)
 
     // ScalaPB runtime
@@ -21,7 +22,6 @@ dependencies {
     implementation("io.bullet:borer-core_3:1.16.2")
     implementation("io.bullet:borer-derivation_3:1.16.2")
     implementation("io.bullet:borer-compat-circe_3:1.16.2")
-    implementation("org.rocksdb:rocksdbjni:9.7.3")
 }
 
 tasks.register("printVersion") {
