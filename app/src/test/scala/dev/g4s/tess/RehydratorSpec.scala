@@ -5,16 +5,16 @@ import org.scalatest.funsuite.AnyFunSuite
 class RehydratorSpec extends AnyFunSuite {
 
   test("rehydrateNewActor should build actor from first UOW events and keep version of last UOW") {
-    val id = FirstActorId(42)
+    val id = StandardId(42)
 
-    val uow1 = UnitOfWork(
+    val uow1 = ActorUnitOfWork(
       ActorKey(id, classOf[FirstActor]),
       actorVersion = 1,
       events = Seq(FirstActorCreatedEvent(1, id, "hi"), FirstActorUpdated(1, id, "hi")),
       startingEventRank = 1
     )
 
-    val uow2 = UnitOfWork(
+    val uow2 = ActorUnitOfWork(
       ActorKey(id, classOf[FirstActor]),
       actorVersion = 2,
       events = Seq(FirstActorUpdated(2, id, "there")),
@@ -32,7 +32,7 @@ class RehydratorSpec extends AnyFunSuite {
   }
 
   test("updateActor should apply events in order") {
-    val id = FirstActorId(7)
+    val id = StandardId(7)
     val initial = FirstActor(id, 0, "a")
     val updated = Rehydrator.updateActor(initial, Seq(FirstActorUpdated(1, id, "ab"), FirstActorUpdated(2, id, "abc")))
     val fa = updated.asInstanceOf[FirstActor]

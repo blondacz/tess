@@ -4,8 +4,15 @@ import scala.util.Try
 
 
 class SimpleCoordinator(val eventStore: EventStore, dispatcher: Dispatcher) extends Coordinator {
-  private val actors = new collection.mutable.HashMap[ActorKey,(List[UnitOfWork], Actor)]
+  private val actors = new collection.mutable.HashMap[ActorKey,(List[ActorUnitOfWork], Actor)]
   private var eventRank : Option[Long] = None
+  private var startEventRank : Long = 0
+
+  override def start(): Long = {
+    startEventRank = lastEventRank.map(_ + 1).getOrElse(1)
+    startEventRank
+  }
+
   override def commit(): Option[Long] = {
     actors.values.map(_._1).tapEach { uows =>
       uows.tapEach(uow => eventStore.store(uow).fold(throw _, identity))
@@ -34,7 +41,7 @@ class SimpleCoordinator(val eventStore: EventStore, dispatcher: Dispatcher) exte
     eventRank
   }
 
-  override def store(uow: UnitOfWork, actor: Actor): Either[Throwable, Unit] = {
+  override def store(uow: ActorUnitOfWork, actor: Actor): Either[Throwable, Unit] = {
     dispatcher.dispatch(uow)
     val akey = uow.key
     actors.put(akey, (actors.getOrElse(akey, (Nil, actor))._1 :+ uow, actor))
@@ -44,9 +51,9 @@ class SimpleCoordinator(val eventStore: EventStore, dispatcher: Dispatcher) exte
 }
 
 class InMemoryEventStore extends EventStore {
-  private val actors = new collection.mutable.HashMap[ActorKey,List[UnitOfWork]]
+  private val actors = new collection.mutable.HashMap[ActorKey,List[ActorUnitOfWork]]
   private var eventRank : Option[Long] = None
-  override def store(uow: UnitOfWork): Either[Throwable, Unit] = {
+  override def store(uow: ActorUnitOfWork): Either[Throwable, Unit] = {
     eventRank = Some(uow.endingEventRank)
     actors.updateWith(uow.key) {
       maybeUows =>
@@ -54,14 +61,14 @@ class InMemoryEventStore extends EventStore {
     }.map(_ => ()).toRight(new AssertionError("should not happen in memory"))
   }
 
-  override def load(key: ActorKey): Either[Throwable, List[UnitOfWork]] = actors.get(key).orElse(Some(Nil)).toRight(new AssertionError("should not happen in memory"))
+  override def load(key: ActorKey): Either[Throwable, List[ActorUnitOfWork]] = actors.get(key).orElse(Some(Nil)).toRight(new AssertionError("should not happen in memory"))
   override def lastEventRank: Option[Long] = eventRank
 }
 
 
 object Rehydrator {
 
-  def rehydrateNewActor[AF <: ActorFactory, ID <: Id](id: ID, uows: List[UnitOfWork])(actorFactory: AF { type ActorIdType = ID}): Option[(Actor,Long)] = {
+  def rehydrateNewActor[AF <: ActorFactory, ID <: Id](id: ID, uows: List[ActorUnitOfWork])(actorFactory: AF { type ActorIdType = ID}): Option[(Actor,Long)] = {
     val rehydrated = uows.foldLeft(Option.empty[(Actor, Long)]) {
       case (None, uow) =>
         val actor: Option[Actor] = uow.events.headOption.flatMap(
@@ -88,10 +95,10 @@ object Rehydrator {
 }
 
 class MessageHandler( actorFactory: ActorFactory, coordinator: Coordinator) {
-     def handle : PartialFunction[Message,Seq[UnitOfWork]] = {
+     def handle : PartialFunction[Message,Seq[ActorUnitOfWork]] = {
        case msg if actorFactory.route.isDefinedAt(msg) =>
          var eventRank = coordinator.lastEventRank.fold(1L)(i => i + 1)
-         actorFactory.route(msg).foldLeft(List.empty[UnitOfWork]) { case (uows,id) =>
+         actorFactory.route(msg).foldLeft(List.empty[ActorUnitOfWork]) { case (uows,id) =>
            val loadKey = ActorKey(id, actorFactory.actorClass)
            coordinator.load(loadKey)(actorFactory) match {
              case Left(ex) => throw ex //FIXME: propagat
@@ -104,7 +111,7 @@ class MessageHandler( actorFactory: ActorFactory, coordinator: Coordinator) {
                } else Nil
                val updatedActor = Rehydrator.updateActor(actor, actorEvents)
 
-               val uow = UnitOfWork(ActorKey(id, actor.getClass), 1, initialEvent +: actorEvents, eventRank)
+               val uow = ActorUnitOfWork(ActorKey(id, actor.getClass), 1, initialEvent +: actorEvents, eventRank)
                coordinator.store(uow, updatedActor).fold(throw _, identity)//FIXME: propagat
                eventRank = eventRank + 1 /*initial*/ +  actorEvents.size
                uows :+ uow
@@ -114,7 +121,7 @@ class MessageHandler( actorFactory: ActorFactory, coordinator: Coordinator) {
                   } else Nil
                   val updatedActor = Rehydrator.updateActor(rehydrated, actorEvents)
 
-                  val uow = UnitOfWork(ActorKey(id, updatedActor.getClass), v + 1, actorEvents, eventRank)
+                  val uow = ActorUnitOfWork(ActorKey(id, updatedActor.getClass), v + 1, actorEvents, eventRank)
                   coordinator.store(uow, updatedActor).fold(throw _, identity) //FIXME: propagat
                   eventRank = eventRank + actorEvents.size
                   uows :+ uow
@@ -126,19 +133,19 @@ class MessageHandler( actorFactory: ActorFactory, coordinator: Coordinator) {
 }
 
 trait Dispatcher {
-  def dispatch(unitOfWork: UnitOfWork) : Unit
-  def replay(from: Long): List[UnitOfWork]
+  def dispatch(unitOfWork: ActorUnitOfWork) : Unit
+  def replay(from: Long): List[ActorUnitOfWork]
   def commit(eventRank: Long): Unit
   def rollback(): Unit
 }
 
 class MemorizingDispatcher extends Dispatcher {
-  private val dispatched = new collection.mutable.ArrayBuffer[UnitOfWork]
+  private val dispatched = new collection.mutable.ArrayBuffer[ActorUnitOfWork]
   private var commitedUptTo = 0L
-  override def dispatch(unitOfWork: UnitOfWork): Unit =
+  override def dispatch(unitOfWork: ActorUnitOfWork): Unit =
     dispatched += unitOfWork
 
-  def replay(from: Long): List[UnitOfWork] = dispatched.filter(_.endingEventRank >= from).toList
+  def replay(from: Long): List[ActorUnitOfWork] = dispatched.filter(_.endingEventRank >= from).toList
   def commit(eventRank: Long): Unit = commitedUptTo = eventRank
   def rollback(): Unit = dispatched.dropWhile(_.endingEventRank > commitedUptTo)
 }
@@ -149,15 +156,15 @@ class EventSourcedSystem(actorFactories: Seq[ActorFactory]) {
   val dispatcher = new MemorizingDispatcher()
   val coordinator = new SimpleCoordinator(eventStore, dispatcher)
   private val messageHandlers = actorFactories.map(af => new MessageHandler(af, coordinator))
-  def process(msg: Message): Either[Throwable, Seq[UnitOfWork]] = {
-    val lastEventRank = coordinator.lastEventRank.getOrElse(0L)
+  def process(msg: Message): Either[Throwable, Seq[ActorUnitOfWork]] = {
+    val lastEventRank = coordinator.start()
     Try(process(msg, List.empty)).toEither match {
       case l@Left(value) =>
         coordinator.rollback()
-        Left(value).withRight[Seq[UnitOfWork]]
+        Left(value).withRight[Seq[ActorUnitOfWork]]
       case r@Right(value) =>
         coordinator.commit()
-        Right(dispatcher.replay(lastEventRank + 1))
+        Right(dispatcher.replay(lastEventRank))
     }
   }
 
@@ -166,8 +173,8 @@ class EventSourcedSystem(actorFactories: Seq[ActorFactory]) {
   //if UOWS are empty and acc is not take first event from first UOW prepend rest of the UOW to the ACC process the event (convert to message first)
   //if both UOWS and acc is empty finish
   //discard the UOWs if they dont have any more events
-  def process(msg: Message, acc: Seq[UnitOfWork]): Unit = {
-      val produced: Seq[UnitOfWork] = messageHandlers.flatMap { mh =>
+  def process(msg: Message, acc: Seq[ActorUnitOfWork]): Unit = {
+      val produced: Seq[ActorUnitOfWork] = messageHandlers.flatMap { mh =>
         if (mh.handle.isDefinedAt(msg)) mh.handle(msg) else Nil
       }
 
@@ -181,7 +188,7 @@ class EventSourcedSystem(actorFactories: Seq[ActorFactory]) {
     }
 
 
-  private def split(uow: UnitOfWork, acc: Seq[UnitOfWork]): Option[(Message, Seq[UnitOfWork])] =
+  private def split(uow: ActorUnitOfWork, acc: Seq[ActorUnitOfWork]): Option[(Message, Seq[ActorUnitOfWork])] =
     uow.headEvent match {
       case (Some(e),Some(uow)) =>  Some(e.asMessage-> (uow +: acc))
       case (Some(e),None) =>  Some((e.asMessage-> acc))

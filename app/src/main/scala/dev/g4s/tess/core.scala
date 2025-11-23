@@ -12,30 +12,31 @@ trait Id extends Product with Serializable
 
 case class ActorKey(id: Id, clazz: Class[? <: Actor])
 
-case class UnitOfWork(key: ActorKey,
-                      actorVersion: Long,
-                      events: Seq[Event],
-                      startingEventRank: Long) {
+case class ActorUnitOfWork(key: ActorKey,
+                           actorVersion: Long,
+                           events: Seq[Event],
+                           startingEventRank: Long) {
   lazy val endingEventRank : Long = startingEventRank + events.size -1
-  lazy val headEvent : (Option[Event],Option[UnitOfWork]) = events.headOption-> {
-    if (events.tail.isEmpty) None else Some(UnitOfWork(key, actorVersion + 1, events.tail, endingEventRank + 1))
+  lazy val headEvent : (Option[Event],Option[ActorUnitOfWork]) = events.headOption-> {
+    if (events.tail.isEmpty) None else Some(ActorUnitOfWork(key, actorVersion + 1, events.tail, endingEventRank + 1))
   }
 }
 
 
 trait EventStore {
-  def store(uow: UnitOfWork): Either[Throwable,Unit]
-  def load(key: ActorKey): Either[Throwable,List[UnitOfWork]]
+  def store(uow: ActorUnitOfWork): Either[Throwable,Unit]
+  def load(key: ActorKey): Either[Throwable,List[ActorUnitOfWork]]
   def lastEventRank : Option[Long]
 }
 
 trait Coordinator {
   def eventStore: EventStore
+  def start() :  Long
   def commit() :  Option[Long]
   def rollback() : Unit
   def load[AF <: ActorFactory, ID <: Id](key: ActorKey)( actorFactory: AF { type ActorIdType = ID}): Either[Throwable,Option[(Actor,Long)]]
   def lastEventRank : Option[Long]
-  def store(uow: UnitOfWork, actor: Actor): Either[Throwable,Unit]
+  def store(uow: ActorUnitOfWork, actor: Actor): Either[Throwable,Unit]
 }
 
 
