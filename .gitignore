@@ -37,3 +37,5 @@ project.md
 .bloop/
 .metals/
 .vscode/settings.json
+.gradle-local/
+.vscode/
