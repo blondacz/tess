@@ -1,12 +1,12 @@
 package dev.g4s.tess
 
 import dev.g4s.tess.proto.{fromProtoActorUnitOfWork, toProtoActorUnitOfWork}
-import dev.g4s.tess.raft.v1.tess.{ActorUnitOfWork => ProtoActorUnitOfWork}
-import org.rocksdb._
+import dev.g4s.tess.raft.v1.tess.ActorUnitOfWork as ProtoActorUnitOfWork
+import org.rocksdb.*
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import scala.util.Try
+import scala.util.Using
 
 // RocksDB-backed EventStore using three column families:
 // actors:   a:<actorType>:<actorId>:<eventRank> -> ActorUnitOfWork (protobuf)
@@ -36,28 +36,26 @@ class RocksDbEventStore(dbPath: String, group: String = "main") extends EventSto
 
   private var cachedLastRank: Option[Long] = readLastEventRank()
 
-  override def store(uow: ActorUnitOfWork): Either[Throwable, Unit] =
-    Try {
-      val batch = new WriteBatch()
-      try {
+  private val LastEventRankKey = "lastEventRank"
+
+  override def store(uow: ActorUnitOfWork): Either[Throwable, Unit] = {
+    Using(new WriteBatch()) { batch =>
         val key = actorKey(uow.key, uow.startingEventRank)
         val value = toProtoActorUnitOfWork(uow).toByteArray
         batch.put(actorsCf, key, value)
         cachedLastRank = Some(uow.endingEventRank)
-        batch.put(raftMetaCf, raftMetaKey("lastEventRank"), longToBytes(uow.endingEventRank))
+        //TODO: write the log as well, we can always rollback on the last comitted
+        batch.put(raftMetaCf, raftMetaKey(LastEventRankKey), longToBytes(uow.endingEventRank))
         db.write(writeOptions, batch)
         ()
-      } finally {
-        batch.close()
-      }
     }.toEither
+  }
 
   override def load(key: ActorKey): Either[Throwable, List[ActorUnitOfWork]] =
-    Try {
-      val prefix = actorKeyPrefix(key)
-      val prefixBytes = prefix.getBytes(StandardCharsets.UTF_8)
-      val iter = db.newIterator(actorsCf)
-      try {
+    val prefix = actorKeyPrefix(key)
+    val prefixBytes = prefix.getBytes(StandardCharsets.UTF_8)
+
+    Using(db.newIterator(actorsCf)) { iter =>
         val results = collection.mutable.ListBuffer.empty[(Long, ActorUnitOfWork)]
         iter.seek(prefixBytes)
         while (iter.isValid && new String(iter.key(), StandardCharsets.UTF_8).startsWith(prefix)) {
@@ -68,9 +66,6 @@ class RocksDbEventStore(dbPath: String, group: String = "main") extends EventSto
           iter.next()
         }
         results.sortBy(_._1).map(_._2).toList
-      } finally {
-        iter.close()
-      }
     }.toEither
 
   override def lastEventRank: Option[Long] = {
@@ -81,6 +76,7 @@ class RocksDbEventStore(dbPath: String, group: String = "main") extends EventSto
   }
 
   override def close(): Unit = {
+    db.flushWal(true)
     handles.forEach(_.close())
     db.close()
     writeOptions.close()
@@ -106,7 +102,7 @@ class RocksDbEventStore(dbPath: String, group: String = "main") extends EventSto
     s"r:$group:meta:$field".getBytes(StandardCharsets.UTF_8)
 
   private def readLastEventRank(): Option[Long] =
-    Option(db.get(raftMetaCf, raftMetaKey("lastEventRank"))).map(bytesToLong)
+    Option(db.get(raftMetaCf, raftMetaKey(LastEventRankKey))).map(bytesToLong)
 
   private def longToBytes(value: Long): Array[Byte] =
     ByteBuffer.allocate(java.lang.Long.BYTES).putLong(value).array()
