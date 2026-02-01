@@ -1,0 +1,40 @@
+sequenceDiagram
+    participant Client
+    participant System as EventSourcedSystem
+    participant Handler as MessageHandler
+    participant Coord as Coordinator
+    participant Factory as ActorFactory
+    participant Actor
+    participant Store as EventStore
+    participant Disp as Dispatcher
+
+    Client->>System: process(msg)
+    System->>Coord: start() -> startRank
+    System->>Handler: handle(msg)
+    Handler->>Factory: route(msg)
+    Factory-->>Handler: actorIds
+    loop per actorId
+        Handler->>Coord: load(actorKey)
+        alt existing actor
+            Coord->>Store: load(actorKey)
+            Store-->>Coord: uows
+            Coord-->>Handler: actor, version
+        else new actor
+            Factory->>Factory: receive(msg) -> initEvent
+            Factory->>Actor: create(initEvent)
+        end
+        Actor->>Actor: receive(msg) -> events
+        Actor->>Actor: update(events)
+        Handler->>Coord: store(uow, actor)
+        Coord->>Disp: dispatch(uow)
+    end
+    alt success
+        System->>Coord: commit()
+        Coord->>Store: store(uow…)
+        Coord->>Disp: commit(lastRank)
+        Coord-->>System: lastRank
+    else failure
+        System->>Coord: rollback()
+        Coord->>Disp: rollback()
+    end
+    System-->>Client: replayed UOWs
