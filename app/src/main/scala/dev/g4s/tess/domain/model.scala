@@ -1,6 +1,6 @@
-package dev.g4s.tess
+package dev.g4s.tess.domain
 
-import scala.util.Try
+import dev.g4s.tess.core.*
 
 
 case class FirstActorMessage(cid: Long, actorIds: List[Long], text: String) extends Message
@@ -66,4 +66,3 @@ case class SecondActor(id: StandardId, cid : Long, text: String) extends Actor {
     case SecondActorUpdated(cid, _, txt) => copy(cid = cid, text = txt)
   }
 }
-

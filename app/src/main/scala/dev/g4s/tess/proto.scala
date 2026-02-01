@@ -1,6 +1,8 @@
 package dev.g4s.tess
 
 import com.google.protobuf.ByteString
+import dev.g4s.tess.core.{Actor, ActorKey, ActorUnitOfWork, Event, Id}
+import dev.g4s.tess.domain.StandardId
 import dev.g4s.tess.raft.v1.tess.{ActorKey => ProtoActorKey, ActorUnitOfWork => ProtoActorUnitOfWork, EventEnvelope => ProtoEventEnvelope}
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}

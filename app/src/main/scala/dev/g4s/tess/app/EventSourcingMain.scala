@@ -1,6 +1,8 @@
-package dev.g4s.tess
+package dev.g4s.tess.app
 
-import scala.util.Try
+import dev.g4s.tess.coordinator.EventSourcedSystem
+import dev.g4s.tess.core.ActorUnitOfWork
+import dev.g4s.tess.domain.{FirstActorFactory, FirstActorMessage, SecondActorFactory}
 
 object EventSourcingMain {
   def main(args: Array[String]): Unit = {
@@ -18,4 +20,3 @@ object EventSourcingMain {
      println(uows.map{uow => s"${uow.startingEventRank}: ${uow.events.mkString("->")}"}.mkString("\n"))
   }
 }
-

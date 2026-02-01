@@ -1,4 +1,5 @@
 import com.google.protobuf.gradle.*  // <-- important
+import org.gradle.api.tasks.scala.ScalaCompile
 
 plugins {
     `module-scala`
@@ -35,6 +36,12 @@ sourceSets {
             srcDir(project.layout.buildDirectory.dir("generated/source/proto/main/scalapb"))
         }
     }
+}
+
+// Silence Scala warnings coming from generated ScalaPB sources while keeping warnings for handwritten code.
+tasks.withType<ScalaCompile>().configureEach {
+    val existing = scalaCompileOptions.additionalParameters.orEmpty()
+    scalaCompileOptions.additionalParameters = existing + "-Wconf:src=.*/build/generated/.*:silent"
 }
 
 protobuf {
