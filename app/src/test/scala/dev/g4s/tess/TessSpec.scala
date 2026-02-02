@@ -2,10 +2,10 @@ package dev.g4s.tess
 
 import org.scalatest.funsuite.AnyFunSuite
 
-class EventSourcedSystemSpec extends AnyFunSuite {
+class TessSpec extends AnyFunSuite {
 
   test("EventSourcedSystem should process messages and produce UoWs for both actors") {
-    val es = new EventSourcedSystem(Seq(FirstActorFactory, SecondActorFactory))
+    val es = new Tess(Seq(FirstActorFactory, SecondActorFactory))
 
     val uows1 = es.process(FirstActorMessage(1, List(2, 3), "hello")).fold(throw _, identity)
     assert(uows1.nonEmpty)
@@ -21,7 +21,7 @@ class EventSourcedSystemSpec extends AnyFunSuite {
   }
 
   test("SecondActor should be updated based on FirstActor events") {
-    val es = new EventSourcedSystem(Seq(FirstActorFactory, SecondActorFactory))
+    val es = new Tess(Seq(FirstActorFactory, SecondActorFactory))
 
     val id = 5L
     val uows = es.process(FirstActorMessage(10, List(id), "X")).fold(throw _, identity)

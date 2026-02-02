@@ -1,12 +1,20 @@
 package dev.g4s.tess.app
 
-import dev.g4s.tess.EventSourcedSystem
+import dev.g4s.tess.Tess
+import dev.g4s.tess.coordinator.MemorizingDispatcher
 import dev.g4s.tess.core.ActorUnitOfWork
 import dev.g4s.tess.domain.{FirstActorFactory, FirstActorMessage, SecondActorFactory}
+import dev.g4s.tess.store.InMemoryEventStore
 
 object EventSourcingMain {
   def main(args: Array[String]): Unit = {
-    val es = new EventSourcedSystem(Seq(FirstActorFactory, SecondActorFactory))
+    val es = Tess
+      .builder
+      .withActorFactories(FirstActorFactory, SecondActorFactory)
+      .withEventStore(() => new InMemoryEventStore())
+      .withDispatcher(() => new MemorizingDispatcher())
+      .build()
+
     val events= es.process(FirstActorMessage(1,List(2,3), "hello")).fold(throw _,identity)
     print(events)
     val events2 = es.process(FirstActorMessage(2,List(2,3), ", world")).fold(throw _,identity)

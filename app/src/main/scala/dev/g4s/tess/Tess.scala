@@ -7,9 +7,11 @@ import dev.g4s.tess.syntax.all._
 
 import scala.util.Try
 
-class EventSourcedSystem(actorFactories: Seq[ActorFactory]) {
-  val eventStore: EventStore = new InMemoryEventStore()
-  val dispatcher: Dispatcher = new MemorizingDispatcher()
+class Tess(actorFactories: Seq[ActorFactory], val eventStore: EventStore, val dispatcher: Dispatcher) {
+  // Backwards-compatible constructor for existing call sites using `new Tess(Seq(...))`
+  def this(actorFactories: Seq[ActorFactory]) =
+    this(actorFactories, new InMemoryEventStore(), new MemorizingDispatcher())
+
   val coordinator: Coordinator = new SimpleCoordinator(eventStore, dispatcher)
   private val messageHandlers = actorFactories.map(af => new MessageHandler(af, coordinator))
 
@@ -49,4 +51,18 @@ class EventSourcedSystem(actorFactories: Seq[ActorFactory]) {
       case (n, _)             => throw new AssertionError(s"Invalid combination event $n for $uow")
     }
 
+}
+
+object Tess {
+
+  /**
+    * Backwards-compatible constructor that wires default in-memory components.
+    */
+  def apply(actorFactories: Seq[ActorFactory]): Tess =
+    new Tess(actorFactories, new InMemoryEventStore(), new MemorizingDispatcher())
+
+  /**
+    * Entry point for the lazy/wired builder.
+    */
+  def builder: TessConfig = TessConfig()
 }
