@@ -1,41 +1,41 @@
 @startuml
 participant Client
-participant System as EventSourcedSystem
-participant Handler as MessageHandler
-participant Coord as Coordinator
-participant Factory as ActorFactory
+participant EventSourcedSystem 
+participant MessageHandler
+participant Coordinator
+participant ActorFactory
 participant Actor
-participant Store as EventStore
-participant Disp as Dispatcher
+participant EventStore
+participant Disp
 
-Client ->> System: process(msg)
-System ->> Coord: start() -> startRank
-System ->> Handler: handle(msg)
-Handler ->> Factory: route(msg)
-Factory -->> Handler: actorIds
+Client ->> EventSourcedSystem: process(msg)
+EventSourcedSystem ->> Coordinator: start() -> startRank
+EventSourcedSystem ->> MessageHandler: handle(msg)
+MessageHandler ->> ActorFactory: route(msg)
+ActorFactory -->> MessageHandler: actorIds
 loop per actorId
-  Handler ->> Coord: load(actorKey)
+  MessageHandler ->> Coordinator: load(actorKey)
   alt existing actor
-    Coord ->> Store: load(actorKey)
-    Store -->> Coord: uows
-    Coord -->> Handler: actor, version
+    Coordinator ->> EventStore: load(actorKey)
+    EventStore -->> Coordinator: uows
+    Coordinator -->> MessageHandler: actor, version
   else new actor
-    Factory ->> Factory: receive(msg) -> initEvent
-    Factory ->> Actor: create(initEvent)
+    ActorFactory ->> ActorFactory: receive(msg) -> initEvent
+    ActorFactory ->> Actor: create(initEvent)
   end
   Actor ->> Actor: receive(msg) -> events
   Actor ->> Actor: update(events)
-  Handler ->> Coord: store(uow, actor)
-  Coord ->> Disp: dispatch(uow)
+  MessageHandler ->> Coordinator: store(uow, actor)
+  Coordinator ->> Disp: dispatch(uow)
 end
 alt success
-  System ->> Coord: commit()
-  Coord ->> Store: store(uow…)
-  Coord ->> Disp: commit(lastRank)
-  Coord -->> System: lastRank
+  EventSourcedSystem ->> Coordinator: commit()
+  Coordinator ->> EventStore: store(uow…)
+  Coordinator ->> Disp: commit(lastRank)
+  Coordinator -->> EventSourcedSystem: lastRank
 else failure
-  System ->> Coord: rollback()
-  Coord ->> Disp: rollback()
+  EventSourcedSystem ->> Coordinator: rollback()
+  Coordinator ->> Disp: rollback()
 end
-System -->> Client: replayed UOWs
+EventSourcedSystem -->> Client: replayed UOWs
 @enduml

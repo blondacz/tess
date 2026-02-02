@@ -11,7 +11,7 @@ class MessageHandler(actorFactory: ActorFactory, coordinator: Coordinator) {
     case msg if actorFactory.route.isDefinedAt(msg) =>
       val startingRank = coordinator.lastEventRank.fold(1L)(_ + 1)
 
-      actorFactory.route(msg).foldLeft((List.empty[ActorUnitOfWork], startingRank)) {
+      val (resultUows, rank) = actorFactory.route(msg).foldLeft((List.empty[ActorUnitOfWork], startingRank)) {
         case ((uows, rank), id) =>
           val loadKey = ActorKey(id, actorFactory.actorClass)
 
@@ -35,7 +35,8 @@ class MessageHandler(actorFactory: ActorFactory, coordinator: Coordinator) {
           }
 
           (uows :+ uow, nextRank)
-      }._1
+      }
+      resultUows
   }
 
   // Actor.receive may legally drop a message by returning an empty Seq; this helper centralizes that handling.

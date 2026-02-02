@@ -24,6 +24,7 @@ class SimpleCoordinator(val eventStore: EventStore, dispatcher: Dispatcher) exte
 
   override def rollback(): Unit = {
     actors.clear()
+    dispatcher.rollback()
     eventRank = None
   }
 
