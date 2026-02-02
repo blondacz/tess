@@ -79,6 +79,7 @@ class RocksDbEventStore(dbPath: String, group: String = "main") extends EventSto
 
   override def close(): Unit = {
     db.flushWal(true)
+    db.cancelAllBackgroundWork(true)
     handles.forEach(_.close())
     db.close()
     writeOptions.close()
