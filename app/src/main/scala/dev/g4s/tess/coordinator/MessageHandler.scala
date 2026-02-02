@@ -1,7 +1,8 @@
 package dev.g4s.tess.coordinator
 
-import dev.g4s.tess.core.{Actor, ActorFactory, ActorKey, ActorUnitOfWork, Event, EventMessage, Message}
+import dev.g4s.tess.core.{Actor, ActorFactory, ActorKey, ActorUnitOfWork, Event, Message}
 import dev.g4s.tess.store.{EventStore, InMemoryEventStore}
+import dev.g4s.tess.syntax.all.*
 
 import scala.util.Try
 
@@ -32,11 +33,11 @@ class MessageHandler(actorFactory: ActorFactory, coordinator: Coordinator) {
       }
   }
 
-  private def dispatchMessage(msg: Message, rehydrated: Actor) : (Actor,Seq[Event]) = {
-    val actorEvents = if (rehydrated.receive.isDefinedAt(msg)) {
-      rehydrated.receive(msg)
+  private def dispatchMessage(msg: Message, a: Actor) : (Actor,Seq[Event]) = {
+    val actorEvents = if (a.receive.isDefinedAt(msg)) {
+      a.receive(msg)
     } else Nil
-    val updatedActor: Actor = Rehydrator.updateActor(rehydrated, actorEvents)
+    val updatedActor =  actorEvents.foldLeft(a) { case (a, e) => a.update(e) }
     (updatedActor,actorEvents)
   }
 }
@@ -61,8 +62,8 @@ class EventSourcedSystem(actorFactories: Seq[ActorFactory]) {
 
   // if UOWs are non-empty get first event from first UOW convert it to message, prepend all the UOWs to acc (but the first event) and process the created message
   //if UOWS are empty and acc is not take first event from first UOW prepend rest of the UOW to the ACC process the event (convert to message first)
-  //if both UOWS and acc is empty finish
-  //discard the UOWs if they dont have any more events
+  //if both UOWS and acc are empty finish
+  //discard the UOWs if they don't have any more events
   def process(msg: Message, acc: Seq[ActorUnitOfWork]): Unit = {
     val produced: Seq[ActorUnitOfWork] = messageHandlers.flatMap { mh =>
       if (mh.handle.isDefinedAt(msg)) mh.handle(msg) else Nil
@@ -84,11 +85,5 @@ class EventSourcedSystem(actorFactories: Seq[ActorFactory]) {
       case (n, _)                  => throw new AssertionError(s"Invalid combination event $n for $uow")
 
     }
-
-  implicit class EventOps(e: Event) {
-    def asMessage: Message = {
-      EventMessage(e)
-    }
-  }
 
 }

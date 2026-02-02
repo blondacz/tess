@@ -32,7 +32,7 @@ class SimpleCoordinator(val eventStore: EventStore, dispatcher: Dispatcher) exte
       case a @ Some(_) => Right(a)
       case None =>
         val uows = eventStore.load(key)
-        uows.map(w => Rehydrator.rehydrateNewActor(key.id.asInstanceOf[ID], w)(actorFactory))
+        uows.map(w => Rehydrator.rehydrate(key.id.asInstanceOf[ID], w)(actorFactory))
     }
   }
 
@@ -52,7 +52,7 @@ class SimpleCoordinator(val eventStore: EventStore, dispatcher: Dispatcher) exte
 
 object Rehydrator {
 
-  def rehydrateNewActor[AF <: ActorFactory, ID <: Id](id: ID, uows: List[ActorUnitOfWork])(actorFactory: AF { type ActorIdType = ID }): Option[(Actor, Long)] = {
+  def rehydrate[AF <: ActorFactory, ID <: Id](id: ID, uows: List[ActorUnitOfWork])(actorFactory: AF { type ActorIdType = ID }): Option[(Actor, Long)] = {
     val rehydrated = uows.foldLeft(Option.empty[(Actor, Long)]) {
       case (None, uow) =>
         val actor: Option[Actor] = uow.events.headOption.flatMap { e =>
@@ -70,7 +70,4 @@ object Rehydrator {
     }
     rehydrated
   }
-
-  def updateActor(actor: Actor, events: Seq[Event]): Actor =
-    events.foldLeft(actor) { case (a, e) => a.update(e) }
 }

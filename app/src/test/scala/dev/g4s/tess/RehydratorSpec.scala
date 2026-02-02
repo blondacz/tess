@@ -21,7 +21,7 @@ class RehydratorSpec extends AnyFunSuite {
       startingEventRank = 3
     )
 
-    val rehydrated = Rehydrator.rehydrateNewActor(id, List(uow1, uow2))(FirstActorFactory)
+    val rehydrated = Rehydrator.rehydrate(id, List(uow1, uow2))(FirstActorFactory)
     assert(rehydrated.nonEmpty)
     val (actor, version) = rehydrated.get
     assert(version == 2)
@@ -29,14 +29,5 @@ class RehydratorSpec extends AnyFunSuite {
     assert(fa.id == id)
     assert(fa.cid == 2)
     assert(fa.text == "there")
-  }
-
-  test("updateActor should apply events in order") {
-    val id = StandardId(7)
-    val initial = FirstActor(id, 0, "a")
-    val updated = Rehydrator.updateActor(initial, Seq(FirstActorUpdated(1, id, "ab"), FirstActorUpdated(2, id, "abc")))
-    val fa = updated.asInstanceOf[FirstActor]
-    assert(fa.cid == 2)
-    assert(fa.text == "abc")
   }
 }
