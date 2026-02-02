@@ -8,11 +8,7 @@ import dev.g4s.tess.syntax.all._
 import scala.util.Try
 
 class Tess(actorFactories: Seq[ActorFactory], val eventStore: EventStore, val dispatcher: Dispatcher) {
-  // Backwards-compatible constructor for existing call sites using `new Tess(Seq(...))`
-  def this(actorFactories: Seq[ActorFactory]) =
-    this(actorFactories, new InMemoryEventStore(), new MemorizingDispatcher())
-
-  val coordinator: Coordinator = new SimpleCoordinator(eventStore, dispatcher)
+  private val coordinator: Coordinator = new SimpleCoordinator(eventStore, dispatcher)
   private val messageHandlers = actorFactories.map(af => new MessageHandler(af, coordinator))
 
   def process(msg: Message): Either[Throwable, Seq[ActorUnitOfWork]] = {
