@@ -1,6 +1,6 @@
 package dev.g4s.tess.app
 
-import dev.g4s.tess.coordinator.EventSourcedSystem
+import dev.g4s.tess.EventSourcedSystem
 import dev.g4s.tess.core.ActorUnitOfWork
 import dev.g4s.tess.domain.{FirstActorFactory, FirstActorMessage, SecondActorFactory}
 
