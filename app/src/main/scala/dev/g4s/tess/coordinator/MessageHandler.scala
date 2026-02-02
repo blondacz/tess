@@ -9,36 +9,40 @@ import scala.util.Try
 class MessageHandler(actorFactory: ActorFactory, coordinator: Coordinator) {
   def handle: PartialFunction[Message, Seq[ActorUnitOfWork]] = {
     case msg if actorFactory.route.isDefinedAt(msg) =>
-      var eventRank = coordinator.lastEventRank.fold(1L)(i => i + 1)
-      actorFactory.route(msg).foldLeft(List.empty[ActorUnitOfWork]) { case (uows, id) =>
-        val loadKey = ActorKey(id, actorFactory.actorClass)
-        coordinator.load(loadKey)(actorFactory) match {
-          case Left(ex) => throw ex //FIXME: propagat
-          case Right(None) => //create
-            val initialEvent =
-              actorFactory.receive(id)(msg)
-            val actor = actorFactory.create(id)(initialEvent)
-            val (updatedActor, actorEvents) = dispatchMessage(msg, actor)
-            val uow = ActorUnitOfWork(ActorKey(id, actor.getClass), 1, initialEvent +: actorEvents, eventRank)
-            coordinator.store(uow, updatedActor).fold(throw _, identity) //FIXME: propagat
-            eventRank = eventRank + 1 /*initial*/ + actorEvents.size
-            uows :+ uow
-          case Right(Some((rehydrated, v))) =>
-            val (updatedActor, actorEvents) = dispatchMessage(msg, rehydrated)
-            val uow = ActorUnitOfWork(ActorKey(id, updatedActor.getClass), v + 1, actorEvents, eventRank)
-            coordinator.store(uow, updatedActor).fold(throw _, identity) //FIXME: propagat
-            eventRank = eventRank + actorEvents.size
-            uows :+ uow
-        }
-      }
+      val startingRank = coordinator.lastEventRank.fold(1L)(_ + 1)
+
+      actorFactory.route(msg).foldLeft((List.empty[ActorUnitOfWork], startingRank)) {
+        case ((uows, rank), id) =>
+          val loadKey = ActorKey(id, actorFactory.actorClass)
+
+          val (uow, nextRank) = coordinator.load(loadKey)(actorFactory) match {
+            case Left(ex) => throw ex //FIXME: propagate
+
+            case Right(None) => // create
+              val initialEvent =
+                actorFactory.receive(id)(msg)
+              val actor = actorFactory.create(id)(initialEvent)
+              val (updatedActor, actorEvents) = dispatchMessage(msg, actor)
+              val uow = ActorUnitOfWork(ActorKey(id, actor.getClass), 1, initialEvent +: actorEvents, rank)
+              coordinator.store(uow, updatedActor).fold(throw _, identity) //FIXME: propagat
+              uow -> (rank + 1 + actorEvents.size) // initial event counts as +1
+
+            case Right(Some((rehydrated, v))) =>
+              val (updatedActor, actorEvents) = dispatchMessage(msg, rehydrated)
+              val uow = ActorUnitOfWork(ActorKey(id, updatedActor.getClass), v + 1, actorEvents, rank)
+              coordinator.store(uow, updatedActor).fold(throw _, identity) //FIXME: propagat
+              uow -> (rank + actorEvents.size)
+          }
+
+          (uows :+ uow, nextRank)
+      }._1
   }
 
-  private def dispatchMessage(msg: Message, a: Actor) : (Actor,Seq[Event]) = {
-    val actorEvents = if (a.receive.isDefinedAt(msg)) {
-      a.receive(msg)
-    } else Nil
-    val updatedActor =  actorEvents.foldLeft(a) { case (a, e) => a.update(e) }
-    (updatedActor,actorEvents)
+  // Actor.receive may legally drop a message by returning an empty Seq; this helper centralizes that handling.
+  private def dispatchMessage(msg: Message, a: Actor): (Actor, Seq[Event]) = {
+    val actorEvents = if (a.receive.isDefinedAt(msg)) a.receive(msg) else Nil
+    val updatedActor = actorEvents.foldLeft(a) { case (actor, event) => actor.update(event) }
+    (updatedActor, actorEvents)
   }
 }
 
@@ -80,10 +84,8 @@ class EventSourcedSystem(actorFactories: Seq[ActorFactory]) {
 
   private def split(uow: ActorUnitOfWork, acc: Seq[ActorUnitOfWork]): Option[(Message, Seq[ActorUnitOfWork])] =
     uow.headEvent match {
-      case (Some(e), Some(nextUow)) => Some(e.asMessage -> (nextUow +: acc))
-      case (Some(e), None)         => Some((e.asMessage -> acc))
-      case (n, _)                  => throw new AssertionError(s"Invalid combination event $n for $uow")
-
+      case (Some(e), nextUow) => Some(e.asMessage -> (nextUow.toSeq ++ acc))
+      case (n, _)             => throw new AssertionError(s"Invalid combination event $n for $uow")
     }
 
 }
