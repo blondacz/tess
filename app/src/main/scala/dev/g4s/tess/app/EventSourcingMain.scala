@@ -19,7 +19,7 @@ object EventSourcingMain {
     print(events)
     val events2 = es.process(AddItemsForCustomer(2,List(2,3), "oranges")).fold(throw _,identity)
     print(events2)
-    val events3 = es.process(AddItemsForCustomer(3,List(3,3), "grapes")).fold(throw _,identity)
+    val events3 = es.process(AddItemsForCustomer(3,List(2,3), "grapes")).fold(throw _,identity)
     print(events3)
 
     val directBasket = es.process(ListBasket(4, List(2,3))).fold(throw _, identity)
