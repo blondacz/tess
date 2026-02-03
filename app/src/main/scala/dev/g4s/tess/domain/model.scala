@@ -25,7 +25,6 @@ object CustomerFactory extends ActorFactory {
 }
 
 case class CustomerId(id: Long) extends Id
-case class BasketId(id: Long) extends Id
 
 case class Customer(id: CustomerId, cid: Long) extends Actor {
   override type ActorIdType = CustomerId
@@ -40,7 +39,10 @@ case class Customer(id: CustomerId, cid: Long) extends Actor {
   }
 }
 
-case class BasketCreated(cid: Long, basketId: BasketId, itemsCsv: String) extends Event
+
+case class BasketId(id: Long) extends Id
+
+case class BasketCreated(cid: Long, basketId: BasketId) extends Event
 case class BasketUpdated(cid: Long, basketId: BasketId, itemsCsv: String) extends Event
 case class BasketListed(cid: Long, basketId: BasketId, itemsCsv: String) extends Event
 
@@ -54,11 +56,11 @@ object BasketFactory extends ActorFactory {
     case ListBasket(_, ids)                          => ids.map(BasketId(_))
   }
   override def receive(id: ActorIdType): PartialFunction[Message, Event] = {
-    case EventMessage(CustomerUpdated(cid, customerId, items)) => BasketCreated(cid, BasketId(customerId.id), items)
+    case EventMessage(CustomerUpdated(cid, customerId, _)) => BasketCreated(cid, BasketId(customerId.id))
   }
 
   override def create(id: BasketId): PartialFunction[Event, Basket] = {
-    case BasketCreated(_, _, items) => Basket(id, cid = 0) // state populated by events
+    case BasketCreated(_, _) => Basket(id, cid = 0) // state populated by events
   }
 }
 
@@ -79,9 +81,9 @@ case class Basket(id: BasketId, cid: Long, items: List[String] = Nil) extends Ac
 }
 
 object Basket {
-  def parse(csv: String): List[String] =
+  private def parse(csv: String): List[String] =
     csv.split(",").toList.map(_.trim).filter(_.nonEmpty)
 
-  def render(items: List[String]): String =
+  private def render(items: List[String]): String =
     items.mkString(",")
 }

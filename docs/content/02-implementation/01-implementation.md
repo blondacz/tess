@@ -36,8 +36,10 @@ This is a small in-memory event-sourced system written in Scala. It wires togeth
 
 ### Example domain
 - `Customer` and `Basket` demonstrate a simple causal chain:
-  - `Customer` handles `AddItemsForCustomer`, emits `CustomerCreated` (first time) and `CustomerUpdated` (subsequent).
-  - `Basket` listens to those events (wrapped in `EventMessage`) and emits `BasketUpdated`; it can also emit `BasketListed` on `ListBasket` to return current contents.
+  - A single command `AddItemsForCustomer` is used for both create and update:
+    - `CustomerFactory` turns the command into `CustomerCreated` on the first sight of an ID; the actor’s `receive` then emits `CustomerUpdated` (the same command path drives both creation and later updates).
+  - `Basket` listens to `CustomerUpdated` events (wrapped in `EventMessage`), creating itself with `BasketCreated` and then appending items via `BasketUpdated`.
+  - `ListBasket` is a read-style command that produces `BasketListed` containing the current items without mutating state.
 
 ### Current semantics and limits
 - Persistence is in-memory only; there is no durability.
