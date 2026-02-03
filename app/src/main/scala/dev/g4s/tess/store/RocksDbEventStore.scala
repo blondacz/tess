@@ -1,7 +1,6 @@
 package dev.g4s.tess.store
 
 import dev.g4s.tess.core.{ActorKey, ActorUnitOfWork, Id}
-import dev.g4s.tess.domain.StandardId
 import dev.g4s.tess.proto.{fromProtoActorUnitOfWork, toProtoActorUnitOfWork}
 import dev.g4s.tess.raft.v1.tess.ActorUnitOfWork as ProtoActorUnitOfWork
 import org.rocksdb.*
@@ -96,10 +95,7 @@ class RocksDbEventStore(dbPath: String, group: String = "main") extends EventSto
   private def parseRank(key: String): Long =
     key.split(':').last.toLong
 
-  private def idAsString(id: Id): String = id match {
-    case StandardId(v) => v.toString
-    case other => other.toString
-  }
+  private def idAsString(id: Id): String = id.productIterator.mkString("_")
 
   private def raftMetaKey(field: String): Array[Byte] =
     s"r:$group:meta:$field".getBytes(StandardCharsets.UTF_8)

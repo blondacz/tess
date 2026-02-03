@@ -1,7 +1,7 @@
 package dev.g4s.tess.store
 
 import dev.g4s.tess.core.{ActorKey, ActorUnitOfWork}
-import dev.g4s.tess.domain.{FirstActor, FirstActorCreatedEvent, FirstActorUpdated, StandardId}
+import dev.g4s.tess.domain.{Customer, CustomerCreated, CustomerId, CustomerUpdated}
 import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.{Files, Path}
@@ -34,19 +34,19 @@ class EventStoreSpec extends AnyFunSuite {
     test(s"${fixture.name} stores and loads unit-of-work batches in order") {
       val (store, cleanup) = fixture.build()
       try {
-        val key = ActorKey(StandardId(1), classOf[FirstActor])
+        val key = ActorKey(CustomerId(1), classOf[Customer])
 
         val uow1 = ActorUnitOfWork(
           key = key,
           actorVersion = 1,
-          events = Seq(FirstActorCreatedEvent(1, StandardId(1), "hi")),
+          events = Seq(CustomerCreated(1, CustomerId(1), "apples")),
           startingEventRank = 1
         )
 
         val uow2 = ActorUnitOfWork(
           key = key,
           actorVersion = 2,
-          events = Seq(FirstActorUpdated(2, StandardId(1), "there")),
+          events = Seq(CustomerUpdated(2, CustomerId(1), "apples,oranges")),
           startingEventRank = 2
         )
 
@@ -65,11 +65,11 @@ class EventStoreSpec extends AnyFunSuite {
     test(s"${fixture.name} isolates actors and tracks lastEventRank of last write") {
       val (store, cleanup) = fixture.build()
       try {
-        val keyA = ActorKey(StandardId(10), classOf[FirstActor])
-        val keyB = ActorKey(StandardId(20), classOf[FirstActor])
+        val keyA = ActorKey(CustomerId(10), classOf[Customer])
+        val keyB = ActorKey(CustomerId(20), classOf[Customer])
 
-        val a1 = ActorUnitOfWork(keyA, actorVersion = 1, Seq(FirstActorCreatedEvent(1, StandardId(10), "A")), startingEventRank = 1)
-        val b1 = ActorUnitOfWork(keyB, actorVersion = 1, Seq(FirstActorCreatedEvent(2, StandardId(20), "B")), startingEventRank = 5)
+        val a1 = ActorUnitOfWork(keyA, actorVersion = 1, Seq(CustomerCreated(1, CustomerId(10), "A")), startingEventRank = 1)
+        val b1 = ActorUnitOfWork(keyB, actorVersion = 1, Seq(CustomerCreated(2, CustomerId(20), "B")), startingEventRank = 5)
 
         store.store(a1).fold(fail(_), identity)
         store.store(b1).fold(fail(_), identity)
@@ -89,7 +89,7 @@ class EventStoreSpec extends AnyFunSuite {
     test(s"${fixture.name} returns empty list for unknown actor") {
       val (store, cleanup) = fixture.build()
       try {
-        val missing = store.load(ActorKey(StandardId(999), classOf[FirstActor])).fold(throw _, identity)
+        val missing = store.load(ActorKey(CustomerId(999), classOf[Customer])).fold(throw _, identity)
         assert(missing.isEmpty)
         assert(store.lastEventRank.isEmpty)
       } finally {

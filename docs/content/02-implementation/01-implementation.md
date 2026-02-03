@@ -35,9 +35,9 @@ This is a small in-memory event-sourced system written in Scala. It wires togeth
 - `Rehydrator` can build a new actor from a sequence of UOWs (`rehydrateNewActor`) and apply events to an existing actor (`updateActor`).
 
 ### Example domain
-- `FirstActor` and `SecondActor` demonstrate a simple causal chain:
-  - `FirstActor` handles `FirstActorMessage`, emits `FirstActorCreatedEvent` and `FirstActorUpdated`.
-  - `SecondActor` listens to those events (wrapped in `EventMessage`) and emits `SecondActorUpdated`.
+- `Customer` and `Basket` demonstrate a simple causal chain:
+  - `Customer` handles `AddItemsForCustomer`, emits `CustomerCreated` (first time) and `CustomerUpdated` (subsequent).
+  - `Basket` listens to those events (wrapped in `EventMessage`) and emits `BasketUpdated`; it can also emit `BasketListed` on `ListBasket` to return current contents.
 
 ### Current semantics and limits
 - Persistence is in-memory only; there is no durability.

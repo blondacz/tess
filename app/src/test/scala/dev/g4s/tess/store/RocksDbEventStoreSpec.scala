@@ -1,7 +1,7 @@
 package dev.g4s.tess.store
 
 import dev.g4s.tess.core.{ActorKey, ActorUnitOfWork}
-import dev.g4s.tess.domain.{FirstActor, FirstActorCreatedEvent, FirstActorUpdated, StandardId}
+import dev.g4s.tess.domain.{Customer, CustomerCreated, CustomerId, CustomerUpdated}
 import org.scalatest.funsuite.AnyFunSuite
 
 import java.nio.file.{Files, Path}
@@ -25,19 +25,19 @@ class RocksDbEventStoreSpec extends AnyFunSuite {
 
   test("store and load preserve ordering and track lastEventRank across restarts") {
     withTempDir { dir =>
-      val key = ActorKey(StandardId(1), classOf[FirstActor])
+      val key = ActorKey(CustomerId(1), classOf[Customer])
 
       val uow1 = ActorUnitOfWork(
         key = key,
         actorVersion = 1,
-        events = Seq(FirstActorCreatedEvent(1, StandardId(1), "hi")),
+        events = Seq(CustomerCreated(1, CustomerId(1), "apples")),
         startingEventRank = 1
       )
 
       val uow2 = ActorUnitOfWork(
         key = key,
         actorVersion = 2,
-        events = Seq(FirstActorUpdated(2, StandardId(1), "there")),
+        events = Seq(CustomerUpdated(2, CustomerId(1), "apples,oranges")),
         startingEventRank = 2
       )
 
@@ -60,7 +60,7 @@ class RocksDbEventStoreSpec extends AnyFunSuite {
       val reloaded = reopened.load(key).fold(throw _, identity)
       assert(reloaded == List(uow1, uow2))
 
-      val missing = reopened.load(ActorKey(StandardId(999), classOf[FirstActor])).fold(throw _, identity)
+      val missing = reopened.load(ActorKey(CustomerId(999), classOf[Customer])).fold(throw _, identity)
       assert(missing.isEmpty)
 
       reopened.close()

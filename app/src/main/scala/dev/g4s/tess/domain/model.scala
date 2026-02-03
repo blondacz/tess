@@ -1,68 +1,91 @@
 package dev.g4s.tess.domain
 
-import dev.g4s.tess.core.*
+import dev.g4s.tess.core._
 
+// Messages / events now model a simple Customer -> Basket flow.
+case class AddItemsForCustomer(cid: Long, customerIds: List[Long], itemsCsv: String) extends Message
+case class ListBasket(cid: Long, basketIds: List[Long]) extends Message
+case class CustomerCreated(cid: Long, customerId: CustomerId, initialItemsCsv: String) extends Event
+case class CustomerUpdated(cid: Long, customerId: CustomerId, itemsCsv: String) extends Event
 
-case class FirstActorMessage(cid: Long, actorIds: List[Long], text: String) extends Message
-case class FirstActorCreatedEvent(cid: Long, actorId: StandardId, text: String) extends Event
-case class FirstActorUpdated(cid: Long, actorId: StandardId, text: String) extends Event
+object CustomerFactory extends ActorFactory {
+  override type ActorIdType = CustomerId
+  override type ActorType = Customer
+  override def actorClass: Class[? <: Actor] = classOf[Customer]
 
-object FirstActorFactory extends ActorFactory {
-  override type ActorIdType = StandardId
-  override type ActorType = FirstActor
-  override def actorClass: Class[? <: Actor] = classOf[FirstActor]
-
-  override def route: PartialFunction[Message, List[StandardId]] = {
-    case FirstActorMessage(_,ids,_) => ids.map(StandardId(_))
+  override def route: PartialFunction[Message, List[CustomerId]] = {
+    case AddItemsForCustomer(_, ids, _) => ids.map(CustomerId(_))
   }
   override def receive(id: ActorIdType): PartialFunction[Message, Event] = {
-    case FirstActorMessage(cid,ids,text) => FirstActorCreatedEvent(cid, id, text)
+    case AddItemsForCustomer(cid, _, items) => CustomerCreated(cid, id, items)
   }
-  override def create(id: StandardId): PartialFunction[Event, FirstActor] = {
-    case FirstActorCreatedEvent(cid, aid, text) => FirstActor(id,0,"")//is populated by the message
+  override def create(id: CustomerId): PartialFunction[Event, Customer] = {
+    case CustomerCreated(_, _, _) => Customer(id, cid = 0) // state populated by events
   }
 }
 
-case class StandardId(id: Long) extends Id//better to have different Ids but in order to make serialization easier....
-case class FirstActor(id: StandardId, cid : Long, text: String) extends Actor {
-  override type ActorIdType = StandardId
+case class CustomerId(id: Long) extends Id
+case class BasketId(id: Long) extends Id
+
+case class Customer(id: CustomerId, cid: Long) extends Actor {
+  override type ActorIdType = CustomerId
+
   override def receive: PartialFunction[Message, Seq[Event]] = {
-    case FirstActorMessage(cid,_,txt) => Seq(FirstActorUpdated(cid,id,text + txt))
+    case AddItemsForCustomer(cid, _, itemsCsv) =>
+      Seq(CustomerUpdated(cid, id, itemsCsv))
   }
 
   override def update(event: Event): Actor = event match {
-    case FirstActorUpdated(cid, _, txt) => copy(cid = cid, text = txt)
+    case CustomerCreated(cid, _, _)    => copy(cid = cid)
+    case CustomerUpdated(cid, _, _)    => copy(cid = cid)
   }
 }
 
-case class SecondActorCreatedEvent(cid: Long, actorId: StandardId, text: String) extends Event
-case class SecondActorUpdated(cid: Long, actorId: StandardId, text: String) extends Event
+case class BasketCreated(cid: Long, basketId: BasketId, itemsCsv: String) extends Event
+case class BasketUpdated(cid: Long, basketId: BasketId, itemsCsv: String) extends Event
+case class BasketListed(cid: Long, basketId: BasketId, itemsCsv: String) extends Event
 
-object SecondActorFactory extends ActorFactory {
-  override type ActorIdType = StandardId
-  override type ActorType = SecondActor
-  override def actorClass: Class[? <: Actor] = classOf[SecondActor]
+object BasketFactory extends ActorFactory {
+  override type ActorIdType = BasketId
+  override type ActorType = Basket
+  override def actorClass: Class[? <: Actor] = classOf[Basket]
 
-  override def route: PartialFunction[Message, List[StandardId]] = {
-    case EventMessage(FirstActorCreatedEvent(_,id,_)) => StandardId(id.id) :: Nil
-    case EventMessage(FirstActorUpdated(_,id,_)) => StandardId(id.id) :: Nil
+  override def route: PartialFunction[Message, List[BasketId]] = {
+    case EventMessage(CustomerUpdated(_, id, _))     => BasketId(id.id) :: Nil
+    case ListBasket(_, ids)                          => ids.map(BasketId(_))
   }
   override def receive(id: ActorIdType): PartialFunction[Message, Event] = {
-    case EventMessage(FirstActorCreatedEvent(cid,id,text)) => SecondActorCreatedEvent(cid, StandardId(id.id), text)
+    case EventMessage(CustomerUpdated(cid, customerId, items)) => BasketCreated(cid, BasketId(customerId.id), items)
+    case ListBasket(cid, _)                                    => BasketListed(cid, id, "") // will be filled from actor state
   }
-  override def create(id: StandardId): PartialFunction[Event, SecondActor] = {
-    case SecondActorCreatedEvent(cid, aid, text) => SecondActor(id,0,"")//is populated by the message
+  override def create(id: BasketId): PartialFunction[Event, Basket] = {
+    case BasketCreated(_, _, items) => Basket(id, cid = 0, items = Basket.parse(items)) // state populated by events
   }
 }
 
-case class SecondActor(id: StandardId, cid : Long, text: String) extends Actor {
-  override type ActorIdType = StandardId
+case class Basket(id: BasketId, cid: Long, items: List[String]) extends Actor {
+  override type ActorIdType = BasketId
+
   override def receive: PartialFunction[Message, Seq[Event]] = {
-    case EventMessage(FirstActorCreatedEvent(_,id,text)) => Seq(SecondActorUpdated(cid,id,s"First actor inserted with text: ${text}"))
-    case EventMessage(FirstActorUpdated(_,id,text)) => Seq(SecondActorUpdated(cid,id,s"First actor updated with text: ${text}"))
+    case EventMessage(CustomerCreated(cid, id, items)) =>
+      Seq(BasketUpdated(cid, BasketId(id.id), items))
+    case EventMessage(CustomerUpdated(cid, id, items)) =>
+      Seq(BasketUpdated(cid, BasketId(id.id), items))
+    case ListBasket(cid, _) =>
+      Seq(BasketListed(cid, id, Basket.render(items)))
   }
 
   override def update(event: Event): Actor = event match {
-    case SecondActorUpdated(cid, _, txt) => copy(cid = cid, text = txt)
+    case BasketCreated(cid, _, itemsCsv) => copy(cid = cid, items = Basket.parse(itemsCsv))
+    case BasketUpdated(cid, _, itemsCsv) => copy(cid = cid, items = items ++ Basket.parse(itemsCsv))
+    case BasketListed(_, _, _)           => this
   }
+}
+
+object Basket {
+  def parse(csv: String): List[String] =
+    csv.split(",").toList.map(_.trim).filter(_.nonEmpty)
+
+  def render(items: List[String]): String =
+    items.mkString(",")
 }
