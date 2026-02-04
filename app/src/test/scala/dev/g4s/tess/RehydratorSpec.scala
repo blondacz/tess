@@ -8,15 +8,15 @@ class RehydratorSpec extends AnyFunSuite {
     val uow1 = ActorUnitOfWork(
       ActorKey(CustomerId(42), classOf[Customer]),
       actorVersion = 1,
-      events = Seq(CustomerCreated(1, CustomerId(42), "apples"), CustomerUpdated(1, CustomerId(42), "apples")),
-      startingEventRank = 1
+      reactions = Seq(CustomerCreated(1, CustomerId(42), "apples"), CustomerUpdated(1, CustomerId(42), "apples")),
+      startingReactionRank = 1
     )
 
     val uow2 = ActorUnitOfWork(
       ActorKey(CustomerId(42), classOf[Customer]),
       actorVersion = 2,
-      events = Seq(CustomerUpdated(2, CustomerId(42), "apples,oranges")),
-      startingEventRank = 3
+      reactions = Seq(CustomerUpdated(2, CustomerId(42), "apples,oranges")),
+      startingReactionRank = 3
     )
 
     val id = CustomerId(42)

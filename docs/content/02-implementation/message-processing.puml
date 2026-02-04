@@ -1,41 +1,48 @@
 @startuml
 participant Client
-participant EventSourcedSystem 
-participant MessageHandler
-participant Coordinator
-participant ActorFactory
+participant Tess as EventSourcedSystem 
+participant Handler as MessageHandler
+participant Coord as Coordinator
+participant Factory as ActorFactory
 participant Actor
-participant EventStore
-participant Disp
+participant Store as EventStore
+participant Disp as Dispatcher
 
-Client ->> EventSourcedSystem: process(msg)
-EventSourcedSystem ->> Coordinator: start() -> startRank
-EventSourcedSystem ->> MessageHandler: handle(msg)
-MessageHandler ->> ActorFactory: route(msg)
-ActorFactory -->> MessageHandler: actorIds
+== Kickoff ==
+Client ->> Tess: process(initial Message)
+Tess ->> Coord: start() -> startRank
+Tess ->> Handler: handle(Message)
+
+== Produce reactions per actor ==
+Handler ->> Factory: route(msg)
+Factory -->> Handler: actorIds
 loop per actorId
-  MessageHandler ->> Coordinator: load(actorKey)
+  Handler ->> Coord: load(actorKey)
   alt existing actor
-    Coordinator ->> EventStore: load(actorKey)
-    EventStore -->> Coordinator: uows
-    Coordinator -->> MessageHandler: actor, version
+    Coord ->> Store: load(actorKey)
+    Store -->> Coord: uows
+    Coord -->> Handler: actor, version
   else new actor
-    ActorFactory ->> ActorFactory: receive(msg) -> initEvent
-    ActorFactory ->> Actor: create(initEvent)
+    Factory ->> Factory: receive(msg) -> initEvent
+    Factory ->> Actor: create(initEvent)
   end
-  Actor ->> Actor: receive(msg) -> events
-  Actor ->> Actor: update(events)
-  MessageHandler ->> Coordinator: store(uow, actor)
-  Coordinator ->> Disp: dispatch(uow)
+  Actor ->> Actor: receive(msg) -> reactions (Event | Command | Notification)
+  Actor ->> Actor: update(events only)
+  Handler ->> Coord: store(ActorUnitOfWork(reactions), actor)
+  Coord ->> Disp: dispatch(uow)  # in-order delivery (events, commands, notifications)
 end
+
+== Commit or rollback ==
 alt success
-  EventSourcedSystem ->> Coordinator: commit()
-  Coordinator ->> EventStore: store(uow…)
-  Coordinator ->> Disp: commit(lastRank)
-  Coordinator -->> EventSourcedSystem: lastRank
+  Tess ->> Coord: commit()
+  Coord ->> Store: store(uow…)
+  Coord ->> Disp: commit(lastRank)
+  Coord -->> Tess: lastRank
 else failure
-  EventSourcedSystem ->> Coordinator: rollback()
-  Coordinator ->> Disp: rollback()
+  Tess ->> Coord: rollback()
+  Coord ->> Disp: rollback()
 end
-EventSourcedSystem -->> Client: replayed UOWs
+
+== Replay ==
+Tess -->> Client: replayed UOWs (reactions preserved in sequence)
 @enduml

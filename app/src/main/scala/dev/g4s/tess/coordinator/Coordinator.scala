@@ -9,6 +9,6 @@ trait Coordinator {
   def commit(): Option[Long]
   def rollback(): Unit
   def load[AF <: ActorFactory, ID <: Id](key: ActorKey)(actorFactory: AF { type ActorIdType = ID }): Either[Throwable, Option[(Actor, Long)]]
-  def lastEventRank: Option[Long]
+  def lastReactionRank: Option[Long]
   def store(uow: ActorUnitOfWork, actor: Actor): Either[Throwable, Unit]
 }

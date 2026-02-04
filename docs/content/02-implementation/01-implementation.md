@@ -7,22 +7,22 @@ This is a small in-memory event-sourced system written in Scala. It wires togeth
 - `Message` and `Event`: input/output signals for the system. `EventMessage` wraps events when reprocessing.
 - `Actor`: domain object that can produce new events from messages (`receive`) and mutate itself from events (`update`). Each actor has a typed `Id`.
 - `ActorFactory`: routes messages to actor IDs, builds new actors from creation events, and exposes the actor class for lookup.
-- `ActorUnitOfWork`: a batch of events for a single actor, with the actor version, starting event rank, and a computed ending rank.
+- `ActorUnitOfWork`: a batch of reactions for a single actor (events, commands, notifications), with the actor version, starting reaction rank, and a computed ending rank.
 
 ### Persistence and coordination
-- `EventStore`: minimal trait with `store`, `load`, and `lastEventRank`. Current implementation is `InMemoryEventStore`, which just holds data in a map keyed by `ActorKey`.
+- `EventStore`: minimal trait with `store`, `load`, and `lastReactionRank`. Current implementation is `InMemoryEventStore`, which just holds data in a map keyed by `ActorKey`.
 - `Dispatcher`: receives unit-of-work batches before commit, and is told when a commit succeeds. `MemorizingDispatcher` buffers dispatched UOWs, supports `replay(fromRank)`, and trims on rollback.
 - `SimpleCoordinator`:
   - Keeps an in-memory map of staged actors and their UOWs.
-  - `start()` grabs the next event rank (last rank + 1, defaulting to 1).
-  - `store(uow, actor)` stages the UOW, updates `eventRank`, and calls `dispatcher.dispatch(uow)` immediately.
-  - `commit()` flushes all staged UOWs to the `EventStore`, clears the stage, and calls `dispatcher.commit(lastEventRank)`.
-  - `rollback()` clears staged UOWs and drops the transient `eventRank`.
+  - `start()` grabs the next reaction rank (last rank + 1, defaulting to 1).
+  - `store(uow, actor)` stages the UOW, updates `reactionRank`, and calls `dispatcher.dispatch(uow)` immediately.
+  - `commit()` flushes all staged UOWs to the `EventStore`, clears the stage, and calls `dispatcher.commit(lastReactionRank)`.
+  - `rollback()` clears staged UOWs and drops the transient `reactionRank`.
   - `load()` reads from the staged map first, otherwise from the `EventStore`, and rehydrates via `Rehydrator`.
 
 ### Message handling flow
 - `MessageHandler` wraps an `ActorFactory` and the `Coordinator`.
-  - On `handle(msg)`, it computes the current event rank (last + 1).
+  - On `handle(msg)`, it computes the current reaction rank (last + 1).
   - For each routed actor ID:
     - If no actor exists, it creates one using the factory, produces initial events, updates the actor with any additional events, and stages a UOW starting at the current rank. The rank is advanced by the number of produced events.
     - If the actor exists (rehydrated), it produces events via `receive`, updates the actor, stages a UOW, and advances the rank by the number of events.

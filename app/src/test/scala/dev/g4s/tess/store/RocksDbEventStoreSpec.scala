@@ -23,22 +23,22 @@ class RocksDbEventStoreSpec extends AnyFunSuite {
     }
   }
 
-  test("store and load preserve ordering and track lastEventRank across restarts") {
+  test("store and load preserve ordering and track lastReactionRank across restarts") {
     withTempDir { dir =>
       val key = ActorKey(CustomerId(1), classOf[Customer])
 
       val uow1 = ActorUnitOfWork(
         key = key,
         actorVersion = 1,
-        events = Seq(CustomerCreated(1, CustomerId(1), "apples")),
-        startingEventRank = 1
+        reactions = Seq(CustomerCreated(1, CustomerId(1), "apples")),
+        startingReactionRank = 1
       )
 
       val uow2 = ActorUnitOfWork(
         key = key,
         actorVersion = 2,
-        events = Seq(CustomerUpdated(2, CustomerId(1), "apples,oranges")),
-        startingEventRank = 2
+        reactions = Seq(CustomerUpdated(2, CustomerId(1), "apples,oranges")),
+        startingReactionRank = 2
       )
 
       // First session: write two unit-of-work batches
@@ -46,7 +46,7 @@ class RocksDbEventStoreSpec extends AnyFunSuite {
       store.store(uow1).fold(fail(_), identity)
       store.store(uow2).fold(fail(_), identity)
 
-      assert(store.lastEventRank.contains(uow2.endingEventRank))
+      assert(store.lastReactionRank.contains(uow2.endingReactionRank))
 
       val loaded = store.load(key).fold(throw _, identity)
       assert(loaded == List(uow1, uow2))
@@ -55,7 +55,7 @@ class RocksDbEventStoreSpec extends AnyFunSuite {
 
       // Second session: ensure data and last rank survive a restart
       val reopened = new RocksDbEventStore(dir.toString)
-      assert(reopened.lastEventRank.contains(uow2.endingEventRank))
+      assert(reopened.lastReactionRank.contains(uow2.endingReactionRank))
 
       val reloaded = reopened.load(key).fold(throw _, identity)
       assert(reloaded == List(uow1, uow2))

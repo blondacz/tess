@@ -10,9 +10,9 @@ import java.nio.charset.StandardCharsets
 import scala.util.Using
 
 // RocksDB-backed EventStore using three column families:
-// actors:   a:<actorType>:<actorId>:<eventRank> -> ActorUnitOfWork (protobuf)
-// raft-log: r:<group>:<logIndex>                -> RaftLogIndexEntry (reserved, not used here)
-// raft-meta:r:<group>:meta:<field>              -> metadata entries (stores lastEventRank)
+// actors:   a:<actorType>:<actorId>:<reactionRank> -> ActorUnitOfWork (protobuf)
+// raft-log: r:<group>:<logIndex>                    -> RaftLogIndexEntry (reserved, not used here)
+// raft-meta:r:<group>:meta:<field>                  -> metadata entries (stores lastReactionRank)
 class RocksDbEventStore(dbPath: String, group: String = "main") extends EventStore with AutoCloseable {
   RocksDB.loadLibrary()
 
@@ -35,18 +35,18 @@ class RocksDbEventStore(dbPath: String, group: String = "main") extends EventSto
   private val actorsCf = handles.get(1)
   private val raftMetaCf = handles.get(3)
 
-  private var cachedLastRank: Option[Long] = readLastEventRank()
+  private var cachedLastRank: Option[Long] = readLastReactionRank()
 
-  private val LastEventRankKey = "lastEventRank"
+  private val LastReactionRankKey = "lastReactionRank"
 
   override def store(uow: ActorUnitOfWork): Either[Throwable, Unit] = {
     Using(new WriteBatch()) { batch =>
-        val key = actorKey(uow.key, uow.startingEventRank)
+        val key = actorKey(uow.key, uow.startingReactionRank)
         val value = toProtoActorUnitOfWork(uow).toByteArray
         batch.put(actorsCf, key, value)
-        cachedLastRank = Some(uow.endingEventRank)
+        cachedLastRank = Some(uow.endingReactionRank)
         //TODO: write the log as well, we can always rollback on the last comitted
-        batch.put(raftMetaCf, raftMetaKey(LastEventRankKey), longToBytes(uow.endingEventRank))
+        batch.put(raftMetaCf, raftMetaKey(LastReactionRankKey), longToBytes(uow.endingReactionRank))
         db.write(writeOptions, batch)
         ()
     }.toEither
@@ -69,9 +69,9 @@ class RocksDbEventStore(dbPath: String, group: String = "main") extends EventSto
         results.sortBy(_._1).map(_._2).toList
     }.toEither
 
-  override def lastEventRank: Option[Long] = {
+  override def lastReactionRank: Option[Long] = {
     cachedLastRank.orElse {
-      cachedLastRank = readLastEventRank()
+      cachedLastRank = readLastReactionRank()
       cachedLastRank
     }
   }
@@ -89,8 +89,8 @@ class RocksDbEventStore(dbPath: String, group: String = "main") extends EventSto
   private def actorKeyPrefix(key: ActorKey): String =
     s"a:${key.clazz.getName}:${idAsString(key.id)}:"
 
-  private def actorKey(key: ActorKey, eventRank: Long): Array[Byte] =
-    s"${actorKeyPrefix(key)}$eventRank".getBytes(StandardCharsets.UTF_8)
+  private def actorKey(key: ActorKey, reactionRank: Long): Array[Byte] =
+    s"${actorKeyPrefix(key)}$reactionRank".getBytes(StandardCharsets.UTF_8)
 
   private def parseRank(key: String): Long =
     key.split(':').last.toLong
@@ -100,8 +100,8 @@ class RocksDbEventStore(dbPath: String, group: String = "main") extends EventSto
   private def raftMetaKey(field: String): Array[Byte] =
     s"r:$group:meta:$field".getBytes(StandardCharsets.UTF_8)
 
-  private def readLastEventRank(): Option[Long] =
-    Option(db.get(raftMetaCf, raftMetaKey(LastEventRankKey))).map(bytesToLong)
+  private def readLastReactionRank(): Option[Long] =
+    Option(db.get(raftMetaCf, raftMetaKey(LastReactionRankKey))).map(bytesToLong)
 
   private def longToBytes(value: Long): Array[Byte] =
     ByteBuffer.allocate(java.lang.Long.BYTES).putLong(value).array()

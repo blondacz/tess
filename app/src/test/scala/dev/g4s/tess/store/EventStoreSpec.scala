@@ -39,15 +39,15 @@ class EventStoreSpec extends AnyFunSuite {
         val uow1 = ActorUnitOfWork(
           key = key,
           actorVersion = 1,
-          events = Seq(CustomerCreated(1, CustomerId(1), "apples")),
-          startingEventRank = 1
+          reactions = Seq(CustomerCreated(1, CustomerId(1), "apples")),
+          startingReactionRank = 1
         )
 
         val uow2 = ActorUnitOfWork(
           key = key,
           actorVersion = 2,
-          events = Seq(CustomerUpdated(2, CustomerId(1), "apples,oranges")),
-          startingEventRank = 2
+          reactions = Seq(CustomerUpdated(2, CustomerId(1), "apples,oranges")),
+          startingReactionRank = 2
         )
 
         store.store(uow1).fold(fail(_), identity)
@@ -56,20 +56,20 @@ class EventStoreSpec extends AnyFunSuite {
         val loaded = store.load(key).fold(throw _, identity)
         assert(loaded == List(uow1, uow2))
 
-        assert(store.lastEventRank.contains(uow2.endingEventRank))
+        assert(store.lastReactionRank.contains(uow2.endingReactionRank))
       } finally {
         cleanup()
       }
     }
 
-    test(s"${fixture.name} isolates actors and tracks lastEventRank of last write") {
+    test(s"${fixture.name} isolates actors and tracks lastReactionRank of last write") {
       val (store, cleanup) = fixture.build()
       try {
         val keyA = ActorKey(CustomerId(10), classOf[Customer])
         val keyB = ActorKey(CustomerId(20), classOf[Customer])
 
-        val a1 = ActorUnitOfWork(keyA, actorVersion = 1, Seq(CustomerCreated(1, CustomerId(10), "A")), startingEventRank = 1)
-        val b1 = ActorUnitOfWork(keyB, actorVersion = 1, Seq(CustomerCreated(2, CustomerId(20), "B")), startingEventRank = 5)
+        val a1 = ActorUnitOfWork(keyA, actorVersion = 1, Seq(CustomerCreated(1, CustomerId(10), "A")), startingReactionRank = 1)
+        val b1 = ActorUnitOfWork(keyB, actorVersion = 1, Seq(CustomerCreated(2, CustomerId(20), "B")), startingReactionRank = 5)
 
         store.store(a1).fold(fail(_), identity)
         store.store(b1).fold(fail(_), identity)
@@ -80,7 +80,7 @@ class EventStoreSpec extends AnyFunSuite {
         assert(loadedA == List(a1))
         assert(loadedB == List(b1))
 
-        assert(store.lastEventRank.contains(b1.endingEventRank))
+        assert(store.lastReactionRank.contains(b1.endingReactionRank))
       } finally {
         cleanup()
       }
@@ -91,7 +91,7 @@ class EventStoreSpec extends AnyFunSuite {
       try {
         val missing = store.load(ActorKey(CustomerId(999), classOf[Customer])).fold(throw _, identity)
         assert(missing.isEmpty)
-        assert(store.lastEventRank.isEmpty)
+        assert(store.lastReactionRank.isEmpty)
       } finally {
         cleanup()
       }

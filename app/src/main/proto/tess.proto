@@ -33,11 +33,11 @@ message ActorUnitOfWork {
   // Version of the actor before applying this UoW
   int64 actor_version = 2;
 
-  // Global event rank of the first event in this UoW
-  int64 starting_event_rank = 3;
+  // Global reaction rank of the first reaction in this UoW
+  int64 starting_reaction_rank = 3;
 
-  // Events in this UoW; endingEventRank can be derived as starting + events.size - 1
-  repeated EventEnvelope events = 4;
+  // Reactions in this UoW; ending_reaction_rank can be derived as starting + reactions.size - 1
+  repeated EventEnvelope events = 4; // legacy name; holds all reactions serialized as events/notifications/commands
 }
 
 // ==============================
@@ -45,7 +45,7 @@ message ActorUnitOfWork {
 // ==============================
 //
 //
-//   a:<actorType>:<actorId>:<startingEventRank>
+//   a:<actorType>:<actorId>:<startingReactionRank>
 //
 // If you want a more granular, per-event record, you can use this:
 
@@ -72,8 +72,8 @@ message ActorEventRecord {
 message RaftLogEntryWire {
   int64 term = 1;
   int64 index = 2;
-  int64 starting_event_rank = 3;
-  int64 ending_event_rank = 4;
+  int64 starting_reaction_rank = 3;
+  int64 ending_reaction_rank = 4;
   repeated ActorUnitOfWork actor_units = 5;
 }
 
@@ -88,8 +88,8 @@ message RaftLogEntryWire {
 // Matches (ActorKey, [start..end]) in  model.
 message LogActorPointer {
   ActorKey actor_key = 1;
-  int64 starting_event_rank = 2;
-  int64 ending_event_rank = 3;
+  int64 starting_reaction_rank = 2;
+  int64 ending_reaction_rank = 3;
 }
 
 //   r:<group_id>:<log_index> => RaftLogIndexEntry

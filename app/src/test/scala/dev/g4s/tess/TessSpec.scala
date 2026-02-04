@@ -12,13 +12,13 @@ class TessSpec extends AnyFunSuite {
     val uows1 = es.process(AddItemsForCustomer(1, List(2, 3), "apples,bananas")).fold(throw _, identity)
     assert(uows1.nonEmpty)
 
-    assert(uows1.forall(_.startingEventRank >= 1))
+    assert(uows1.forall(_.startingReactionRank >= 1))
 
     val uows2 = es.process(AddItemsForCustomer(2, List(2, 3), "oranges")).fold(throw _, identity)
     assert(uows2.nonEmpty)
     // Event ranks must increase across calls
-    val max1 = uows1.map(_.endingEventRank).max
-    val min2 = uows2.map(_.startingEventRank).min
+    val max1 = uows1.map(_.endingReactionRank).max
+    val min2 = uows2.map(_.startingReactionRank).min
     assert(min2 > max1)
   }
 
@@ -41,5 +41,16 @@ class TessSpec extends AnyFunSuite {
     val basketList = es.process(ListBasket(11, List(basketId))).fold(throw _, identity)
     val basketListEvents = basketList.flatMap(_.events).collect { case e: BasketListed => e }
     assert(basketListEvents.exists(_.itemsCsv.contains("milk")))
+  }
+
+  test("Commands produced by actors are routed directly to target actors") {
+    val es = Tess.builder.withActorFactories(CustomerFactory, BasketFactory).build()
+
+    val basketId = 8L
+    val uows = es.process(AddItemsForCustomer(99, List(basketId), "coffee")).fold(throw _, identity)
+
+    val commandApplied = uows.flatMap(_.events).collect { case e: BasketCommandApplied if e.basketId.id == basketId => e }
+    assert(commandApplied.nonEmpty)
+    assert(commandApplied.exists(_.itemsCsv.contains("coffee")))
   }
 }

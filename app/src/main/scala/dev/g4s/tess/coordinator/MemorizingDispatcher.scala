@@ -10,9 +10,9 @@ class MemorizingDispatcher extends Dispatcher {
     dispatched += unitOfWork
 
   def replay(from: Long): List[ActorUnitOfWork] =
-    dispatched.filter(_.endingEventRank >= from).toList
+    dispatched.filter(_.endingReactionRank >= from).toList
 
-  def commit(eventRank: Long): Unit = commitedUptTo = eventRank
+  def commit(reactionRank: Long): Unit = commitedUptTo = reactionRank
 
-  def rollback(): Unit = dispatched.dropWhile(_.endingEventRank > commitedUptTo)
+  def rollback(): Unit = dispatched.dropWhile(_.endingReactionRank > commitedUptTo)
 }

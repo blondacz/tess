@@ -5,12 +5,12 @@ import dev.g4s.tess.store.EventStore
 
 class SimpleCoordinator(val eventStore: EventStore, dispatcher: Dispatcher) extends Coordinator {
   private val actors = new collection.mutable.HashMap[ActorKey, (List[ActorUnitOfWork], Actor)]
-  private var eventRank: Option[Long] = None
-  private var startEventRank: Long = 0
+  private var reactionRank: Option[Long] = None
+  private var startReactionRank: Long = 0
 
   override def start(): Long = {
-    startEventRank = lastEventRank.map(_ + 1).getOrElse(1)
-    startEventRank
+    startReactionRank = lastReactionRank.map(_ + 1).getOrElse(1)
+    startReactionRank
   }
 
   override def commit(): Option[Long] = {
@@ -18,14 +18,14 @@ class SimpleCoordinator(val eventStore: EventStore, dispatcher: Dispatcher) exte
       uows.tapEach(uow => eventStore.store(uow).fold(throw _, identity))
     }
     actors.clear()
-    dispatcher.commit(eventRank.getOrElse(0L))
-    eventRank
+    dispatcher.commit(reactionRank.getOrElse(0L))
+    reactionRank
   }
 
   override def rollback(): Unit = {
     actors.clear()
     dispatcher.rollback()
-    eventRank = None
+    reactionRank = None
   }
 
   override def load[AF <: ActorFactory, ID <: Id](key: ActorKey)(actorFactory: AF { type ActorIdType = ID }): Either[Throwable, Option[(Actor, Long)]] = {
@@ -37,16 +37,16 @@ class SimpleCoordinator(val eventStore: EventStore, dispatcher: Dispatcher) exte
     }
   }
 
-  override def lastEventRank: Option[Long] = {
-    eventRank = eventRank.orElse(eventStore.lastEventRank) // inject during startup
-    eventRank
+  override def lastReactionRank: Option[Long] = {
+    reactionRank = reactionRank.orElse(eventStore.lastReactionRank) // inject during startup
+    reactionRank
   }
 
   override def store(uow: ActorUnitOfWork, actor: Actor): Either[Throwable, Unit] = {
     dispatcher.dispatch(uow)
     val akey = uow.key
     actors.put(akey, (actors.getOrElse(akey, (Nil, actor))._1 :+ uow, actor))
-    eventRank = Some(uow.endingEventRank)
+    reactionRank = Some(uow.endingReactionRank)
     Right(())
   }
 }

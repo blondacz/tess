@@ -10,9 +10,8 @@ trait Id extends Product with Serializable
 
 case class ActorKey(id: Id, clazz: Class[? <: Actor])
 trait Command
-trait Notification
+trait Notification extends Message
 
 object Message {
   type Reaction = Event  | Notification | CommandMessage
-  type ActorMessage = Event  | CommandMessage
 }

@@ -34,7 +34,7 @@ object proto {
     ProtoActorUnitOfWork(
       key = toProtoActorKey(uow.key),
       actorVersion = uow.actorVersion,
-      startingEventRank = uow.startingEventRank,
+      startingReactionRank = uow.startingReactionRank,
       events = uow.events.map(toProtoEvent)
     )
 
@@ -42,8 +42,8 @@ object proto {
     ActorUnitOfWork(
       key = fromProtoActorKey(uow.key),
       actorVersion = uow.actorVersion,
-      events = uow.events.map(fromProtoEvent),
-      startingEventRank = uow.startingEventRank
+      reactions = uow.events.map(fromProtoEvent),
+      startingReactionRank = uow.startingReactionRank
     )
 
   private def serialize(event: Event): Array[Byte] = {

@@ -17,4 +17,5 @@ trait ActorFactory {
   def receive(id: ActorIdType): PartialFunction[Message, Event]
   def create(id: ActorIdType): PartialFunction[Event, ActorType]
   def actorClass: Class[? <: Actor]
+  def idClass: Class[? <: Id]
 }

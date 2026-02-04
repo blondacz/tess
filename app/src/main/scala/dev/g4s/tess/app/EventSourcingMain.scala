@@ -28,6 +28,6 @@ object EventSourcingMain {
 
   private def print(uows: Seq[ActorUnitOfWork]) : Unit=  {
     println(s"\nGenerated ${uows.size} UoWs")
-     println(uows.map{uow => s"${uow.startingEventRank}: ${uow.events.mkString("->")}"}.mkString("\n"))
+     println(uows.map{uow => s"${uow.startingReactionRank}: ${uow.events.mkString("->")}"}.mkString("\n"))
   }
 }

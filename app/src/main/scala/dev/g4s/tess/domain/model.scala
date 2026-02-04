@@ -9,11 +9,13 @@ case class AddItemsForCustomer(cid: Long, customerIds: List[Long], itemsCsv: Str
 case class ListBasket(cid: Long, basketIds: List[Long]) extends Message
 case class CustomerCreated(cid: Long, customerId: CustomerId, initialItemsCsv: String) extends Event
 case class CustomerUpdated(cid: Long, customerId: CustomerId, itemsCsv: String) extends Event
+case class BasketCommandApplied(basketId: BasketId, itemsCsv: String) extends Event
 
 object CustomerFactory extends ActorFactory {
   override type ActorIdType = CustomerId
   override type ActorType = Customer
   override def actorClass: Class[? <: Actor] = classOf[Customer]
+  override def idClass: Class[? <: Id] = classOf[CustomerId]
 
   override def route: PartialFunction[Message, List[CustomerId]] = {
     case AddItemsForCustomer(_, ids, _) => ids.map(CustomerId(_))
@@ -28,14 +30,14 @@ object CustomerFactory extends ActorFactory {
 
 case class CustomerId(id: Long) extends Id
 
-case class Bla(text: String) extends Command
+case class Bla(items: String) extends Command
 
 case class Customer(id: CustomerId, cid: Long) extends Actor {
   override type ActorIdType = CustomerId
 
   override def receive: PartialFunction[Message, Seq[Reaction]] = {
     case AddItemsForCustomer(cid, _, itemsCsv) =>
-      Seq(CustomerUpdated(cid, id, itemsCsv), Bla("ha").to(BasketId(2)) )
+      Seq(CustomerUpdated(cid, id, itemsCsv), Bla(itemsCsv).to(BasketId(id.id)))
   }
 
   override def update(event: Event): Actor = event match {
@@ -54,6 +56,7 @@ object BasketFactory extends ActorFactory {
   override type ActorIdType = BasketId
   override type ActorType = Basket
   override def actorClass: Class[? <: Actor] = classOf[Basket]
+  override def idClass: Class[? <: Id] = classOf[BasketId]
 
   override def route: PartialFunction[Message, List[BasketId]] = {
     case EventMessage(CustomerUpdated(_, id, _))     => BasketId(id.id) :: Nil
@@ -74,12 +77,15 @@ case class Basket(id: BasketId, cid: Long, items: List[String] = Nil) extends Ac
   override def receive: PartialFunction[Message, Seq[Reaction]] = {
     case EventMessage(CustomerUpdated(cid, _, items)) =>
       Seq(BasketUpdated(cid, id, items))
+    case CommandMessage(Bla(itemsCsv), _) =>
+      Seq(BasketCommandApplied(id, itemsCsv))
     case ListBasket(cid, _) =>
       Seq(BasketListed(cid, id, Basket.render(items)))
   }
 
   override def update(event: Event): Actor = event match {
     case BasketUpdated(cid, _, itemsCsv) => copy(cid = cid, items = items ++ Basket.parse(itemsCsv))
+    case BasketCommandApplied(_, itemsCsv) => copy(items = items ++ Basket.parse(itemsCsv))
     case BasketListed(_, _, _)           => this
   }
 }
