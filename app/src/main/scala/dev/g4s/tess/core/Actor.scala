@@ -1,9 +1,11 @@
 package dev.g4s.tess.core
 
+import dev.g4s.tess.core.Message.Reaction
+
 trait Actor {
   type ActorIdType <: Id
   def id: ActorIdType
-  def receive: PartialFunction[Message, Seq[Event]]
+  def receive: PartialFunction[Message, Seq[Reaction]]
   def update(event: Event): Actor
 }
 

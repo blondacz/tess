@@ -1,6 +1,8 @@
 package dev.g4s.tess.domain
 
+import dev.g4s.tess.core.Message.Reaction
 import dev.g4s.tess.core._
+import dev.g4s.tess.syntax.all._
 
 // Messages / events now model a simple Customer -> Basket flow.
 case class AddItemsForCustomer(cid: Long, customerIds: List[Long], itemsCsv: String) extends Message
@@ -26,12 +28,14 @@ object CustomerFactory extends ActorFactory {
 
 case class CustomerId(id: Long) extends Id
 
+case class Bla(text: String) extends Command
+
 case class Customer(id: CustomerId, cid: Long) extends Actor {
   override type ActorIdType = CustomerId
 
-  override def receive: PartialFunction[Message, Seq[Event]] = {
+  override def receive: PartialFunction[Message, Seq[Reaction]] = {
     case AddItemsForCustomer(cid, _, itemsCsv) =>
-      Seq(CustomerUpdated(cid, id, itemsCsv))
+      Seq(CustomerUpdated(cid, id, itemsCsv), Bla("ha").to(BasketId(2)) )
   }
 
   override def update(event: Event): Actor = event match {
@@ -67,7 +71,7 @@ object BasketFactory extends ActorFactory {
 case class Basket(id: BasketId, cid: Long, items: List[String] = Nil) extends Actor {
   override type ActorIdType = BasketId
 
-  override def receive: PartialFunction[Message, Seq[Event]] = {
+  override def receive: PartialFunction[Message, Seq[Reaction]] = {
     case EventMessage(CustomerUpdated(cid, _, items)) =>
       Seq(BasketUpdated(cid, id, items))
     case ListBasket(cid, _) =>
