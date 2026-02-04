@@ -3,7 +3,7 @@ package dev.g4s.tess.store
 import dev.g4s.tess.core.{ActorKey, ActorUnitOfWork, Id}
 import dev.g4s.tess.proto.{fromProtoActorUnitOfWork, toProtoActorUnitOfWork}
 import dev.g4s.tess.raft.v1.tess.ActorUnitOfWork as ProtoActorUnitOfWork
-import org.rocksdb.*
+import org.rocksdb._
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets

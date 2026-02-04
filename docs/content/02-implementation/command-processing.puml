@@ -1,0 +1,41 @@
+@startuml
+title Direct Command Reaction Flow
+
+participant Producer as ActorA
+participant Handler as MessageHandler
+participant Coord as Coordinator
+participant TargetFactory as ActorFactory
+participant Target as ActorB
+participant Store as EventStore
+participant Disp as Dispatcher
+
+== Command emission ==
+ActorA -> ActorA: receive(msg) -> reactions
+note right: reactions include CommandMessage(targetIds)
+ActorA -> Handler: CommandMessage
+
+== Routing and delivery ==
+Handler -> Coord: load(targetKey)
+alt existing target
+  Coord -> Store: load(targetKey)
+  Store -->> Coord: uows
+  Coord -->> Handler: target, version
+else new target
+  TargetFactory -> TargetFactory: receive(cmd) -> initEvent
+  TargetFactory -> Target: create(initEvent)
+end
+Target -> Target: receive(CommandMessage) -> reactions
+Target -> Target: update(events only)
+
+== Persistence & dispatch ==
+Handler -> Coord: store(ActorUnitOfWork(reactions), target)
+Coord -> Disp: dispatch(uow)  # keeps command order with events/notifications
+...
+Coord -> Store: store(uow…) on commit
+
+== Replay ==
+loop replay
+  Disp -> Target: headMessage (CommandMessage) in sequence
+  Target -> Target: receive(CommandMessage)
+end
+@enduml

@@ -1,0 +1,32 @@
+@startuml
+title Notification Reaction Flow
+
+participant Producer as Actor
+participant Handler as MessageHandler
+participant Coord as Coordinator
+participant Store as EventStore
+participant Disp as Dispatcher
+participant External as OutboundSink
+
+== Emit ==
+Actor -> Actor: receive(msg) -> reactions
+note right: reactions include Notification
+Actor -> Handler: Notification
+
+== Capture ==
+Handler -> Coord: store(ActorUnitOfWork(reactions), actor)
+Coord -> Disp: dispatch(uow)  # notifications stay ordered with events/commands
+
+== Persist ==
+Coord -> Store: store(uow…) on commit
+note right: notifications can live in dedicated column family while preserving rank
+
+== Dispatch outward ==
+Disp -> External: send(Notification)  # out-of-system delivery
+
+== Replay ==
+loop replay
+  Disp -> Actor: headMessage(Notification) in recorded order
+  note right: state is untouched; replay just redelivers
+end
+@enduml
