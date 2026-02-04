@@ -49,7 +49,7 @@ class TessSpec extends AnyFunSuite {
     val basketId = 8L
     val uows = es.process(AddItemsForCustomer(99, List(basketId), "coffee")).fold(throw _, identity)
 
-    val commandApplied = uows.flatMap(_.events).collect { case e: BasketCommandApplied if e.basketId.id == basketId => e }
+    val commandApplied = uows.flatMap(_.events).collect { case e: BasketCleared if e.basketId.id == basketId => e }
     assert(commandApplied.nonEmpty)
     assert(commandApplied.exists(_.itemsCsv.contains("coffee")))
   }

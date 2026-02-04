@@ -3,10 +3,12 @@ package dev.g4s.tess.app
 import dev.g4s.tess.Tess
 import dev.g4s.tess.coordinator.MemorizingDispatcher
 import dev.g4s.tess.core.ActorUnitOfWork
-import dev.g4s.tess.domain.{AddItemsForCustomer, ListBasket, BasketFactory, CustomerFactory}
+import dev.g4s.tess.domain.{AddItemsForCustomer, BasketFactory, BasketId, ClearBasket, CustomerFactory, ListBasket}
 import dev.g4s.tess.store.InMemoryEventStore
+import dev.g4s.tess.syntax.all._
 
-object EventSourcingMain {
+
+object TessDemo {
   def main(args: Array[String]): Unit = {
     val es = Tess
       .builder
@@ -23,7 +25,11 @@ object EventSourcingMain {
     print(events3)
 
     val directBasket = es.process(ListBasket(4, List(2,3))).fold(throw _, identity)
-    print(directBasket)
+    print(directBasket) 
+    val directBasket1 = es.process(ClearBasket.to(BasketId(3))).fold(throw _, identity)
+    print(directBasket1) 
+    val directBasket2 = es.process(ListBasket(4, List(2,3))).fold(throw _, identity)
+    print(directBasket2)
   }
 
   private def print(uows: Seq[ActorUnitOfWork]) : Unit=  {

@@ -9,7 +9,7 @@ case class AddItemsForCustomer(cid: Long, customerIds: List[Long], itemsCsv: Str
 case class ListBasket(cid: Long, basketIds: List[Long]) extends Message
 case class CustomerCreated(cid: Long, customerId: CustomerId, initialItemsCsv: String) extends Event
 case class CustomerUpdated(cid: Long, customerId: CustomerId, itemsCsv: String) extends Event
-case class BasketCommandApplied(basketId: BasketId, itemsCsv: String) extends Event
+case class BasketCleared(basketId: BasketId, items: List[String]) extends Event
 
 object CustomerFactory extends ActorFactory {
   override type ActorIdType = CustomerId
@@ -30,14 +30,14 @@ object CustomerFactory extends ActorFactory {
 
 case class CustomerId(id: Long) extends Id
 
-case class Bla(items: String) extends Command
+case object ClearBasket extends Command
 
 case class Customer(id: CustomerId, cid: Long) extends Actor {
   override type ActorIdType = CustomerId
 
   override def receive: PartialFunction[Message, Seq[Reaction]] = {
     case AddItemsForCustomer(cid, _, itemsCsv) =>
-      Seq(CustomerUpdated(cid, id, itemsCsv), Bla(itemsCsv).to(BasketId(id.id)))
+      Seq(CustomerUpdated(cid, id, itemsCsv))
   }
 
   override def update(event: Event): Actor = event match {
@@ -77,15 +77,15 @@ case class Basket(id: BasketId, cid: Long, items: List[String] = Nil) extends Ac
   override def receive: PartialFunction[Message, Seq[Reaction]] = {
     case EventMessage(CustomerUpdated(cid, _, items)) =>
       Seq(BasketUpdated(cid, id, items))
-    case CommandMessage(Bla(itemsCsv), _) =>
-      Seq(BasketCommandApplied(id, itemsCsv))
+    case CommandMessage(ClearBasket, _) =>
+      Seq(BasketCleared(id, items))
     case ListBasket(cid, _) =>
       Seq(BasketListed(cid, id, Basket.render(items)))
   }
 
   override def update(event: Event): Actor = event match {
     case BasketUpdated(cid, _, itemsCsv) => copy(cid = cid, items = items ++ Basket.parse(itemsCsv))
-    case BasketCommandApplied(_, itemsCsv) => copy(items = items ++ Basket.parse(itemsCsv))
+    case BasketCleared(_, _) => copy(items = Nil)
     case BasketListed(_, _, _)           => this
   }
 }
