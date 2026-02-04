@@ -1,41 +1,41 @@
 @startuml
 title Direct Command Reaction Flow
 
-participant Producer as ActorA
-participant Handler as MessageHandler
-participant Coord as Coordinator
-participant TargetFactory as ActorFactory
-participant Target as ActorB
-participant Store as EventStore
-participant Disp as Dispatcher
+participant ActorA
+participant MessageHandler
+participant Coordinator
+participant ActorFactory as ActorFactory
+participant ActorB 
+participant EventStore
+participant Disp
 
 == Command emission ==
 ActorA -> ActorA: receive(msg) -> reactions
 note right: reactions include CommandMessage(targetIds)
-ActorA -> Handler: CommandMessage
+ActorA -> MessageHandler: CommandMessage
 
 == Routing and delivery ==
-Handler -> Coord: load(targetKey)
+MessageHandler -> Coordinator: load(targetKey)
 alt existing target
-  Coord -> Store: load(targetKey)
-  Store -->> Coord: uows
-  Coord -->> Handler: target, version
+  Coordinator -> EventStore: load(targetKey)
+  EventStore -->> Coordinator: uows
+  Coordinator -->> MessageHandler: target, version
 else new target
-  TargetFactory -> TargetFactory: receive(cmd) -> initEvent
-  TargetFactory -> Target: create(initEvent)
+  ActorFactory -> ActorFactory: receive(cmd) -> initEvent
+  ActorFactory -> ActorB: create(initEvent)
 end
-Target -> Target: receive(CommandMessage) -> reactions
-Target -> Target: update(events only)
+ActorB -> ActorB: receive(CommandMessage) -> reactions
+ActorB -> ActorB: update(events only)
 
 == Persistence & dispatch ==
-Handler -> Coord: store(ActorUnitOfWork(reactions), target)
-Coord -> Disp: dispatch(uow)  # keeps command order with events/notifications
+MessageHandler -> Coordinator: EventStore(ActorUnitOfWork(reactions), target)
+Coordinator -> Disp: dispatch(uow)  # keeps command order with events/notifications
 ...
-Coord -> Store: store(uow…) on commit
+Coordinator -> EventStore: EventStore(uow…) on commit
 
 == Replay ==
 loop replay
-  Disp -> Target: headMessage (CommandMessage) in sequence
-  Target -> Target: receive(CommandMessage)
+  Disp -> ActorB: headMessage (CommandMessage) in sequence
+  ActorB -> ActorB: receive(CommandMessage)
 end
 @enduml

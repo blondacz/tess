@@ -4,7 +4,7 @@ import dev.g4s.tess.Tess
 import dev.g4s.tess.coordinator.MemorizingDispatcher
 import dev.g4s.tess.core.ActorUnitOfWork
 import dev.g4s.tess.domain.{AddItemsForCustomer, BasketFactory, BasketId, ClearBasket, CustomerFactory, ListBasket}
-import dev.g4s.tess.store.InMemoryEventStore
+import dev.g4s.tess.store.{InMemoryEventStore, RocksDbEventStore}
 import dev.g4s.tess.syntax.all._
 
 
@@ -13,7 +13,7 @@ object TessDemo {
     val es = Tess
       .builder
       .withActorFactories(CustomerFactory, BasketFactory)
-      .withEventStore(() => new InMemoryEventStore())
+      .withEventStore(() => new RocksDbEventStore("roxsdb","g1"))
       .withDispatcher(() => new MemorizingDispatcher())
       .build()
 
