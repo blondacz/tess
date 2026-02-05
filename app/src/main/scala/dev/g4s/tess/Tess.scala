@@ -5,6 +5,7 @@ import dev.g4s.tess.core.{ActorFactory, ActorUnitOfWork, Message}
 import dev.g4s.tess.store.{EventStore, InMemoryEventStore}
 import dev.g4s.tess.syntax.all._
 
+import scala.annotation.tailrec
 import scala.util.Try
 
 class Tess(actorFactories: Seq[ActorFactory], val eventStore: EventStore, val dispatcher: Dispatcher) {
@@ -27,7 +28,8 @@ class Tess(actorFactories: Seq[ActorFactory], val eventStore: EventStore, val di
   // if UOWS are empty and acc is not take first reaction from first UOW prepend rest of the UOW to the ACC process the reaction (convert to message first)
   // if both UOWS and acc are empty finish
   // discard the UOWs if they don't have any more reactions
-  def process(msg: Message, acc: Seq[ActorUnitOfWork]): Unit = {
+  @tailrec
+  private final def process(msg: Message, acc: Seq[ActorUnitOfWork]): Unit = {
     val producedUows: Seq[ActorUnitOfWork] = messageHandlers.flatMap { mh =>
       if (mh.handle.isDefinedAt(msg)) mh.handle(msg) else Nil
     }
@@ -36,7 +38,10 @@ class Tess(actorFactories: Seq[ActorFactory], val eventStore: EventStore, val di
 
     if (nextAcc.nonEmpty) {
       val res = split(nextAcc.head, nextAcc.tail)
-      res.foreach { case (nextMsg, newAcc) => process(nextMsg, newAcc) }
+      res match {
+        case None => ()
+        case Some(nextMsg, newAcc) => process(nextMsg, newAcc)
+      }
     }
   }
 

@@ -2,6 +2,7 @@ package dev.g4s.tess
 
 import dev.g4s.tess._
 import dev.g4s.tess.domain._
+import dev.g4s.tess.core.CommandMessage
 import org.scalatest.funsuite.AnyFunSuite
 
 class TessSpec extends AnyFunSuite {
@@ -43,11 +44,12 @@ class TessSpec extends AnyFunSuite {
     assert(basketListEvents.exists(_.itemsCsv.contains("milk")))
   }
 
-  test("Commands produced by actors are routed directly to target actors") {
+  test("Commands are routed directly to target actors") {
     val es = Tess.builder.withActorFactories(CustomerFactory, BasketFactory).build()
 
     val basketId = 8L
-    val uows = es.process(AddItemsForCustomer(99, List(basketId), "coffee")).fold(throw _, identity)
+    es.process(AddItemsForCustomer(1, List(basketId), "coffee")).fold(throw _, identity) // ensure basket exists
+    val uows = es.process(CommandMessage(ClearBasket, List(BasketId(basketId)))).fold(throw _, identity)
 
     val basketCleared = uows.flatMap(_.events).collect { case e: BasketCleared if e.basketId.id == basketId => e }
     assert(basketCleared.nonEmpty)
