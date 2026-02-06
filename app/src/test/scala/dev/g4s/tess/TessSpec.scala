@@ -1,6 +1,7 @@
 package dev.g4s.tess
 
 import dev.g4s.tess._
+import dev.g4s.tess.coordinator.MemorizingDispatcher
 import dev.g4s.tess.domain._
 import dev.g4s.tess.core.CommandMessage
 import org.scalatest.funsuite.AnyFunSuite
@@ -8,9 +9,11 @@ import org.scalatest.funsuite.AnyFunSuite
 class TessSpec extends AnyFunSuite {
 
   test("EventSourcedSystem should process messages and produce UoWs for both actors") {
-    val es =  Tess.builder.withActorFactories(CustomerFactory, BasketFactory).build()
+    val es =  Tess.builder.withActorFactories(CustomerFactory, BasketFactory)
+      .build()
 
-    val uows1 = es.process(AddItemsForCustomer(1, List(2, 3), "apples,bananas")).fold(throw _, identity)
+    val uows1  = es.process(AddItemsForCustomer(1, List(2, 3), "apples,bananas")).fold(throw _, identity)
+    
     assert(uows1.nonEmpty)
 
     assert(uows1.forall(_.startingReactionRank >= 1))
@@ -40,7 +43,7 @@ class TessSpec extends AnyFunSuite {
 
     val basketId = id
     val basketList = es.process(ListBasket(11, List(basketId))).fold(throw _, identity)
-    val basketListEvents = basketList.flatMap(_.events).collect { case e: BasketListed => e }
+    val basketListEvents = basketList.flatMap(_.reactions).collect { case e: BasketListed => e }
     assert(basketListEvents.exists(_.itemsCsv.contains("milk")))
   }
 

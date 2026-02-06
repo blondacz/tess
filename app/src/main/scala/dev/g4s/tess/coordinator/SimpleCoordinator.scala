@@ -2,6 +2,7 @@ package dev.g4s.tess.coordinator
 
 import dev.g4s.tess.core.{Actor, ActorFactory, ActorKey, ActorUnitOfWork, Event, Id}
 import dev.g4s.tess.store.EventStore
+import dev.g4s.tess.syntax.all.GenericActorFactory
 
 class SimpleCoordinator(val eventStore: EventStore, dispatcher: Dispatcher) extends Coordinator {
   private val actors = new collection.mutable.HashMap[ActorKey, (List[ActorUnitOfWork], Actor)]
@@ -28,12 +29,12 @@ class SimpleCoordinator(val eventStore: EventStore, dispatcher: Dispatcher) exte
     reactionRank = None
   }
 
-  override def load[AF <: ActorFactory, ID <: Id](key: ActorKey)(actorFactory: AF { type ActorIdType = ID }): Either[Throwable, Option[(Actor, Long)]] = {
+  override def load[AF <: GenericActorFactory](key: ActorKey)(actorFactory: AF): Either[Throwable, Option[(Actor, Long)]] = {
     actors.get(key).map(a => (a._2, a._1.last.actorVersion)) match {
       case a @ Some(_) => Right(a)
       case None =>
         val uows = eventStore.load(key)
-        uows.map(w => Rehydrator.rehydrate(key.id.asInstanceOf[ID], w)(actorFactory))
+        uows.map(w => Rehydrator.rehydrate(key.id.asInstanceOf[actorFactory.ActorIdType], w)(actorFactory))
     }
   }
 
@@ -53,7 +54,7 @@ class SimpleCoordinator(val eventStore: EventStore, dispatcher: Dispatcher) exte
 
 object Rehydrator {
 
-  def rehydrate[AF <: ActorFactory, ID <: Id](id: ID, uows: List[ActorUnitOfWork])(actorFactory: AF { type ActorIdType = ID }): Option[(Actor, Long)] = {
+  def rehydrate[AF <: ActorFactory[ID,?], ID <: Id](id: ID, uows: List[ActorUnitOfWork])(actorFactory: AF { type ActorIdType = ID }): Option[(Actor, Long)] = {
     val rehydrated = uows.foldLeft(Option.empty[(Actor, Long)]) {
       case (None, uow) =>
         val actor: Option[Actor] = uow.events.headOption.flatMap { e =>

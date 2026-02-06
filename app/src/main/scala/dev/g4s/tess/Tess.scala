@@ -2,22 +2,23 @@ package dev.g4s.tess
 
 import dev.g4s.tess.coordinator._
 import dev.g4s.tess.core.{ActorFactory, ActorUnitOfWork, Message}
-import dev.g4s.tess.store.{EventStore, InMemoryEventStore}
+import dev.g4s.tess.store.{EventStore, InMemoryEventStore, RocksDbEventStore}
 import dev.g4s.tess.syntax.all._
 
 import scala.annotation.tailrec
 import scala.util.Try
 
-class Tess(actorFactories: Seq[ActorFactory], val eventStore: EventStore, val dispatcher: Dispatcher) {
+//TODO: probably dont want to return UOWs back, so maybe it can depend on the dispatcher and the type of it and be bound back through extractor
+class Tess[D <: Dispatcher](actorFactories: Seq[GenericActorFactory], val eventStore: EventStore, val dispatcher: D) {
   private val coordinator: Coordinator = new SimpleCoordinator(eventStore, dispatcher)
   private val messageHandlers = actorFactories.map(af => new MessageHandler(af, coordinator))
 
-  def process(msg: Message): Either[Throwable, Seq[ActorUnitOfWork]] = {
+  def process(msg: Message): Either[Throwable, dispatcher.ReplayType] = {
     val lastReactionRank = coordinator.start()
     Try(process(msg, List.empty)).toEither match {
       case l @ Left(value) =>
         coordinator.rollback()
-        Left(value).withRight[Seq[ActorUnitOfWork]]
+        Left(value).withRight[dispatcher.ReplayType]
       case r @ Right(_) =>
         coordinator.commit()
         Right(dispatcher.replay(lastReactionRank))
@@ -58,11 +59,11 @@ object Tess {
   /**
     * Backwards-compatible constructor that wires default in-memory components.
     */
-  def apply(actorFactories: Seq[ActorFactory]): Tess =
+  def apply(actorFactories: Seq[GenericActorFactory]): Tess[?] =
     new Tess(actorFactories, new InMemoryEventStore(), new MemorizingDispatcher())
 
   /**
     * Entry point for the lazy/wired builder.
     */
-  def builder: TessConfig = TessConfig()
+  def builder: TessConfig[List[ActorUnitOfWork]] = TessConfig(Nil,() => new InMemoryEventStore(), () => new MemorizingDispatcher())
 }

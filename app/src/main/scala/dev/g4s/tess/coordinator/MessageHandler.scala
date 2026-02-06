@@ -4,7 +4,7 @@ import dev.g4s.tess.core.Message.Reaction
 import dev.g4s.tess.core.{Actor, ActorFactory, ActorKey, ActorUnitOfWork, CommandMessage, Event, Message}
 import dev.g4s.tess.syntax.all._
 
-class MessageHandler(actorFactory: ActorFactory, coordinator: Coordinator) {
+class MessageHandler(actorFactory: GenericActorFactory, coordinator: Coordinator) {
 
   /** Handles messages this factory can process, producing ordered UoWs. */
   def handle: PartialFunction[Message, Seq[ActorUnitOfWork]] = {

@@ -1,6 +1,6 @@
 package dev.g4s.tess.syntax
 
-import dev.g4s.tess.core.{Command, CommandMessage, Event, EventMessage, Id, Message}
+import dev.g4s.tess.core.{ActorFactory, Command, CommandMessage, Event, EventMessage, Id, Message}
 
 trait EventSyntax {
   implicit final def tessSyntaxEventOps(e: Event): EventOps =
@@ -16,4 +16,6 @@ final class EventOps(private val e: Event) extends AnyVal {
 }
 
 object event extends EventSyntax
-object all extends EventSyntax
+object all extends EventSyntax {
+  type GenericActorFactory = ActorFactory[?,?]
+}

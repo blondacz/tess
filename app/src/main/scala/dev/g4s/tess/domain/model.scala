@@ -7,20 +7,22 @@ import dev.g4s.tess.syntax.all._
 // Messages / events now model a simple Customer -> Basket flow.
 case class AddItemsForCustomer(cid: Long, customerIds: List[Long], itemsCsv: String) extends Message
 case class ListBasket(cid: Long, basketIds: List[Long]) extends Message
+
+case object ClearBasket extends Command
+
 case class CustomerCreated(cid: Long, customerId: CustomerId, initialItemsCsv: String) extends Event
 case class CustomerUpdated(cid: Long, customerId: CustomerId, itemsCsv: String) extends Event
 case class BasketCleared(basketId: BasketId, items: List[String]) extends Event
 
-object CustomerFactory extends ActorFactory {
-  override type ActorIdType = CustomerId
-  override type ActorType = Customer
-  override def actorClass: Class[? <: Actor] = classOf[Customer]
-  override def idClass: Class[? <: Id] = classOf[CustomerId]
+case class BasketCreated(cid: Long, basketId: BasketId) extends Event
+case class BasketUpdated(cid: Long, basketId: BasketId, itemsCsv: String) extends Event with Notification
+case class BasketListed(cid: Long, basketId: BasketId, itemsCsv: String) extends Notification
 
+object CustomerFactory extends ActorFactory[CustomerId,Customer]() {
   override def route: PartialFunction[Message, List[CustomerId]] = {
     case AddItemsForCustomer(_, ids, _) => ids.map(CustomerId(_))
   }
-  override def receive(id: ActorIdType): PartialFunction[Message, Event] = {
+  override def receive(id: CustomerId): PartialFunction[Message, Event] = {
     case AddItemsForCustomer(cid, _, items) => CustomerCreated(cid, id, items)
   }
   override def create(id: CustomerId): PartialFunction[Event, Customer] = {
@@ -29,8 +31,6 @@ object CustomerFactory extends ActorFactory {
 }
 
 case class CustomerId(id: Long) extends Id
-
-case object ClearBasket extends Command
 
 case class Customer(id: CustomerId, cid: Long) extends Actor {
   override type ActorIdType = CustomerId
@@ -48,21 +48,14 @@ case class Customer(id: CustomerId, cid: Long) extends Actor {
 
 case class BasketId(id: Long) extends Id
 
-case class BasketCreated(cid: Long, basketId: BasketId) extends Event
-case class BasketUpdated(cid: Long, basketId: BasketId, itemsCsv: String) extends Event
-case class BasketListed(cid: Long, basketId: BasketId, itemsCsv: String) extends Event
 
-object BasketFactory extends ActorFactory {
-  override type ActorIdType = BasketId
-  override type ActorType = Basket
-  override def actorClass: Class[? <: Actor] = classOf[Basket]
-  override def idClass: Class[? <: Id] = classOf[BasketId]
+object BasketFactory extends ActorFactory[BasketId, Basket]() {
 
   override def route: PartialFunction[Message, List[BasketId]] = {
     case EventMessage(CustomerUpdated(_, id, _))     => BasketId(id.id) :: Nil
     case ListBasket(_, ids)                          => ids.map(BasketId(_))
   }
-  override def receive(id: ActorIdType): PartialFunction[Message, Event] = {
+  override def receive(id: BasketId): PartialFunction[Message, Event] = {
     case EventMessage(CustomerUpdated(cid, customerId, _)) => BasketCreated(cid, BasketId(customerId.id))
   }
 
