@@ -10,6 +10,7 @@ plugins {
 dependencies {
     implementation("org.rocksdb:rocksdbjni:9.7.3")
     implementation(libs.logback)
+    implementation("org.apache.kafka:kafka-clients:3.7.0")
 
     // ScalaPB runtime
     implementation("com.thesamet.scalapb:scalapb-runtime_3:0.11.20")

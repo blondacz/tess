@@ -5,4 +5,5 @@ package object tess {
   export coordinator.{Coordinator, Dispatcher, MemorizingDispatcher, Rehydrator, SimpleCoordinator}
   export domain.{AddItemsForCustomer, ListBasket, Basket, BasketCreated, BasketFactory, BasketId, BasketUpdated, BasketListed, Customer, CustomerCreated, CustomerFactory, CustomerId, CustomerUpdated}
   export store.{EventStore, InMemoryEventStore, RocksDbEventStore}
+  export input.{InputQueue, InputRouter, InputRuntime, InputSource, KafkaInputSource, AmpsInputSource, AmpsClient, HttpInputSource, InputSettings, InputQueues, DirectInput}
 }

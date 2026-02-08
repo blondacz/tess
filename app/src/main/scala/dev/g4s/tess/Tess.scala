@@ -1,19 +1,41 @@
 package dev.g4s.tess
 
 import dev.g4s.tess.coordinator._
-import dev.g4s.tess.core.{ActorFactory, ActorUnitOfWork, Message}
-import dev.g4s.tess.store.{EventStore, InMemoryEventStore, RocksDbEventStore}
+import dev.g4s.tess.core.{ActorUnitOfWork, Message}
+import dev.g4s.tess.input.{DirectInput, InputQueues, InputRuntime, InputSettings, InputRouter}
+import dev.g4s.tess.store.{EventStore, InMemoryEventStore}
 import dev.g4s.tess.syntax.all._
 
 import scala.annotation.tailrec
 import scala.util.Try
 
-//TODO: probably dont want to return UOWs back, so maybe it can depend on the dispatcher and the type of it and be bound back through extractor
-class Tess[D <: Dispatcher](actorFactories: Seq[GenericActorFactory], val eventStore: EventStore, val dispatcher: D) {
+class Tess[D <: Dispatcher](
+    actorFactories: Seq[GenericActorFactory],
+    val eventStore: EventStore,
+    val dispatcher: D,
+    inputSettings: InputSettings
+) {
   private val coordinator: Coordinator = new SimpleCoordinator(eventStore, dispatcher)
   private val messageHandlers = actorFactories.map(af => new MessageHandler(af, coordinator))
+  private val queues: InputQueues = InputQueues(inputSettings.adminCapacity, inputSettings.busCapacity, inputSettings.inputCapacity)
+  private val router = new InputRouter[dispatcher.ReplayType](
+    processMessage,
+    queues.admin,
+    queues.bus,
+    queues.input,
+    inputSettings.pollTimeout,
+    inputSettings.busBurst
+  )
+  private val sources = inputSettings.sources.map(_(queues)) 
+  private val runtime: InputRuntime[dispatcher.ReplayType] = new InputRuntime(
+    queues.admin,
+    queues.bus,
+    queues.input,
+    sources,
+    router
+  )
 
-  def process(msg: Message): Either[Throwable, dispatcher.ReplayType] = {
+  private def processMessage(msg: Message): Either[Throwable, dispatcher.ReplayType] = {
     val lastReactionRank = coordinator.start()
     Try(process(msg, List.empty)).toEither match {
       case l @ Left(value) =>
@@ -25,10 +47,6 @@ class Tess[D <: Dispatcher](actorFactories: Seq[GenericActorFactory], val eventS
     }
   }
 
-  // if UOWs are non-empty get first reaction from first UOW convert it to message, prepend all the UOWs to acc (but the first reaction) and process the created message
-  // if UOWS are empty and acc is not take first reaction from first UOW prepend rest of the UOW to the ACC process the reaction (convert to message first)
-  // if both UOWS and acc are empty finish
-  // discard the UOWs if they don't have any more reactions
   @tailrec
   private final def process(msg: Message, acc: Seq[ActorUnitOfWork]): Unit = {
     val producedUows: Seq[ActorUnitOfWork] = messageHandlers.flatMap { mh =>
@@ -38,8 +56,7 @@ class Tess[D <: Dispatcher](actorFactories: Seq[GenericActorFactory], val eventS
     val nextAcc = producedUows ++ acc
 
     if (nextAcc.nonEmpty) {
-      val res = split(nextAcc.head, nextAcc.tail)
-      res match {
+      split(nextAcc.head, nextAcc.tail) match {
         case None => ()
         case Some(nextMsg, newAcc) => process(nextMsg, newAcc)
       }
@@ -52,18 +69,23 @@ class Tess[D <: Dispatcher](actorFactories: Seq[GenericActorFactory], val eventS
       case (n, _)               => throw new AssertionError(s"Invalid combination event $n for $uow")
     }
 
+
+  def startInputs(): Unit = runtime.start()
+  def stopInputs(): Unit = runtime.stop()
 }
 
 object Tess {
 
   /**
-    * Backwards-compatible constructor that wires default in-memory components.
+    * Backwards-compatible constructor that wires default in-memory components and direct input.
     */
-  def apply(actorFactories: Seq[GenericActorFactory]): Tess[?] =
-    new Tess(actorFactories, new InMemoryEventStore(), new MemorizingDispatcher())
+  def apply(actorFactories: Seq[GenericActorFactory]): Tess[?] = {
+    TessConfig(actorFactories, () => new InMemoryEventStore(), () => new MemorizingDispatcher()).build()
+  }
 
   /**
     * Entry point for the lazy/wired builder.
     */
-  def builder: TessConfig[List[ActorUnitOfWork]] = TessConfig(Nil,() => new InMemoryEventStore(), () => new MemorizingDispatcher())
+  def builder: TessConfig[List[ActorUnitOfWork]] =
+    TessConfig(Nil, () => new InMemoryEventStore(), () => new MemorizingDispatcher())
 }
