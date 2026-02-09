@@ -3,7 +3,7 @@ package dev.g4s.tess
 import dev.g4s.tess.*
 import dev.g4s.tess.coordinator.MemorizingDispatcher
 import dev.g4s.tess.domain.*
-import dev.g4s.tess.core.CommandMessage
+import dev.g4s.tess.core.{CommandMessage, TraceContext}
 import dev.g4s.tess.input.DirectInput
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -22,7 +22,8 @@ class TessSpec extends AnyFunSuite with Matchers {
       .build()
     es.startInputs()
     try {
-      direct.put(AddItemsForCustomer(1, List(2), "apples,bananas"))
+      val traceContext = new TraceContext(Map("tkey" -> "tval"))
+      direct.put(AddItemsForCustomer(1, List(2), "apples,bananas"), traceContext)
       val uows1 = awaitUows(disp, 1)
       uows1.size should be (2) // customer then basket
 
@@ -34,6 +35,7 @@ class TessSpec extends AnyFunSuite with Matchers {
         CustomerUpdated(1, CustomerId(2), "apples,bananas")
       )
       customerUow.startingReactionRank shouldBe 1L
+      customerUow.trace shouldBe traceContext
 
       val basketUow = uows1(1)
       basketUow.key shouldBe ActorKey(BasketId(2), classOf[Basket])

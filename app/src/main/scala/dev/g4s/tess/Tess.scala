@@ -1,7 +1,7 @@
 package dev.g4s.tess
 
 import dev.g4s.tess.coordinator._
-import dev.g4s.tess.core.{ActorUnitOfWork, Message}
+import dev.g4s.tess.core.{ActorUnitOfWork, Envelope, Message}
 import dev.g4s.tess.input.{DirectInput, InputQueues, InputRuntime, InputSettings, InputRouter}
 import dev.g4s.tess.store.{EventStore, InMemoryEventStore}
 import dev.g4s.tess.syntax.all._
@@ -19,7 +19,7 @@ class Tess[D <: Dispatcher](
   private val messageHandlers = actorFactories.map(af => new MessageHandler(af, coordinator))
   private val queues: InputQueues = InputQueues(inputSettings.adminCapacity, inputSettings.busCapacity, inputSettings.inputCapacity)
   private val router = new InputRouter[dispatcher.ReplayType](
-    processMessage,
+    processEnvelope,
     queues.admin,
     queues.bus,
     queues.input,
@@ -35,9 +35,9 @@ class Tess[D <: Dispatcher](
     router
   )
 
-  private def processMessage(msg: Message): Either[Throwable, dispatcher.ReplayType] = {
+  private def processEnvelope(env: Envelope): Either[Throwable, dispatcher.ReplayType] = {
     val lastReactionRank = coordinator.start()
-    Try(process(msg, List.empty)).toEither match {
+    Try(process(env, List.empty)).toEither match {
       case l @ Left(value) =>
         coordinator.rollback()
         Left(value).withRight[dispatcher.ReplayType]
@@ -48,9 +48,9 @@ class Tess[D <: Dispatcher](
   }
 
   @tailrec
-  private final def process(msg: Message, acc: Seq[ActorUnitOfWork]): Unit = {
+  private final def process(env: Envelope, acc: Seq[ActorUnitOfWork]): Unit = {
     val producedUows: Seq[ActorUnitOfWork] = messageHandlers.flatMap { mh =>
-      if (mh.handle.isDefinedAt(msg)) mh.handle(msg) else Nil
+      if (mh.handle.isDefinedAt(env)) mh.handle(env) else Nil
     }
 
     val nextAcc = producedUows ++ acc
@@ -58,14 +58,14 @@ class Tess[D <: Dispatcher](
     if (nextAcc.nonEmpty) {
       split(nextAcc.head, nextAcc.tail) match {
         case None => ()
-        case Some(nextMsg, newAcc) => process(nextMsg, newAcc)
+        case Some(nextEnv, newAcc) => process(nextEnv, newAcc)
       }
     }
   }
 
-  private def split(uow: ActorUnitOfWork, acc: Seq[ActorUnitOfWork]): Option[(Message, Seq[ActorUnitOfWork])] =
-    uow.headMessage match {
-      case (Some(msg), nextUow) => Some(msg -> (nextUow.toSeq ++ acc))
+  private def split(uow: ActorUnitOfWork, acc: Seq[ActorUnitOfWork]): Option[(Envelope, Seq[ActorUnitOfWork])] =
+    uow.headEnvelope match {
+      case (Some(env), nextUow) => Some(env -> (nextUow.toSeq ++ acc))
       case (n, _)               => throw new AssertionError(s"Invalid combination event $n for $uow")
     }
 

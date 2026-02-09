@@ -1,7 +1,7 @@
 package dev.g4s.tess
 
 import com.google.protobuf.ByteString
-import dev.g4s.tess.core.{Actor, ActorKey, ActorUnitOfWork, Event, Id}
+import dev.g4s.tess.core.{Actor, ActorKey, ActorUnitOfWork, Event, Id, TraceContext}
 import dev.g4s.tess.domain.{Basket, BasketId, Customer, CustomerId}
 import dev.g4s.tess.raft.v1.tess.{ActorKey => ProtoActorKey, ActorUnitOfWork => ProtoActorUnitOfWork, EventEnvelope => ProtoEventEnvelope}
 
@@ -35,7 +35,8 @@ object proto {
       key = toProtoActorKey(uow.key),
       actorVersion = uow.actorVersion,
       startingReactionRank = uow.startingReactionRank,
-      events = uow.events.map(toProtoEvent)
+      events = uow.events.map(toProtoEvent),
+      metadata = uow.trace.fields
     )
 
   def fromProtoActorUnitOfWork(uow: ProtoActorUnitOfWork): ActorUnitOfWork =
@@ -43,7 +44,8 @@ object proto {
       key = fromProtoActorKey(uow.key),
       actorVersion = uow.actorVersion,
       reactions = uow.events.map(fromProtoEvent),
-      startingReactionRank = uow.startingReactionRank
+      startingReactionRank = uow.startingReactionRank,
+      trace = dev.g4s.tess.core.TraceContext(Option(uow.metadata).getOrElse(Map.empty))
     )
 
   private def serialize(event: Event): Array[Byte] = {

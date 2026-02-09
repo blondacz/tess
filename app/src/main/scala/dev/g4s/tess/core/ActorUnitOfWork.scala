@@ -7,7 +7,8 @@ case class ActorUnitOfWork(
     key: ActorKey,
     actorVersion: Long,
     reactions: Seq[Reaction],
-    startingReactionRank: Long
+    startingReactionRank: Long,
+    trace: TraceContext = TraceContext.empty
 ) {
   // rank now counts all reactions (events, notifications, commands) to preserve ordering for replay/audit
   lazy val endingReactionRank: Long = startingReactionRank + reactions.size - 1
@@ -15,10 +16,10 @@ case class ActorUnitOfWork(
   // convenience to access only events for stateful concerns
   lazy val events: Seq[Event] = reactions.collect { case e: Event => e }
 
-  lazy val headMessage: (Option[Message], Option[ActorUnitOfWork]) =
-    reactions.headOption.map(reactionToMessage) -> {
+  lazy val headEnvelope: (Option[Envelope], Option[ActorUnitOfWork]) =
+    reactions.headOption.map(r => Envelope(reactionToMessage(r), trace)) -> {
       if (reactions.tail.isEmpty) None
-      else Some(ActorUnitOfWork(key, actorVersion + 1, reactions.tail, endingReactionRank + 1))
+      else Some(ActorUnitOfWork(key, actorVersion + 1, reactions.tail, endingReactionRank + 1, trace))
     }
 
   private def reactionToMessage(r: Reaction): Message = r match {

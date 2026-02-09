@@ -38,6 +38,9 @@ message ActorUnitOfWork {
 
   // Reactions in this UoW; ending_reaction_rank can be derived as starting + reactions.size - 1
   repeated EventEnvelope events = 4; // legacy name; holds all reactions serialized as events/notifications/commands
+
+  // Optional tracing / provenance metadata (e.g., kafka offset, traceparent).
+  map<string, string> metadata = 5;
 }
 
 // ==============================

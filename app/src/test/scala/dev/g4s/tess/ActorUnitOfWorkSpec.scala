@@ -23,15 +23,15 @@ class ActorUnitOfWorkSpec extends AnyFunSuite {
 
   test("headMessage should return first reaction and None when there is only one reaction") {
     val uow = ActorUnitOfWork(ActorKey(TestId(1), classOf[TestActor]), 1, Seq(E1), startingReactionRank = 5)
-    val (head, next) = uow.headMessage
-    assert(head.contains(EventMessage(E1)))
+    val (head, next) = uow.headEnvelope
+    assert(head.exists(_.message == EventMessage(E1)))
     assert(next.isEmpty)
   }
 
   test("headMessage should return first reaction and the rest as next UnitOfWork") {
     val uow = ActorUnitOfWork(ActorKey(TestId(1), classOf[TestActor]), 3, Seq(E1, E2), startingReactionRank = 7)
-    val (head, next) = uow.headMessage
-    assert(head.contains(EventMessage(E1)))
+    val (head, next) = uow.headEnvelope
+    assert(head.exists(_.message == EventMessage(E1)))
     val nextUow = next.get
     assert(nextUow.actorVersion == 4) // increased by 1
     assert(nextUow.startingReactionRank == uow.endingReactionRank + 1)
