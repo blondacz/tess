@@ -1,14 +1,16 @@
 package dev.g4s.tess
 
-import dev.g4s.tess._
+import dev.g4s.tess.*
 import dev.g4s.tess.coordinator.MemorizingDispatcher
-import dev.g4s.tess.domain._
+import dev.g4s.tess.domain.*
 import dev.g4s.tess.core.CommandMessage
 import dev.g4s.tess.input.DirectInput
 import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
+
 import scala.concurrent.duration.*
 
-class TessSpec extends AnyFunSuite {
+class TessSpec extends AnyFunSuite with Matchers {
 
   test("EventSourcedSystem should process messages and produce UoWs for both actors") {
     val disp = new MemorizingDispatcher()
@@ -20,10 +22,31 @@ class TessSpec extends AnyFunSuite {
       .build()
     es.startInputs()
     try {
-      direct.put(AddItemsForCustomer(1, List(2, 3), "apples,bananas"))
+      direct.put(AddItemsForCustomer(1, List(2), "apples,bananas"))
       val uows1 = awaitUows(disp, 1)
-      direct.put(AddItemsForCustomer(2, List(2, 3), "oranges"))
+      uows1.size should be (2) // customer then basket
+
+      val customerUow = uows1.head
+      customerUow.key shouldBe ActorKey(CustomerId(2), classOf[Customer])
+      customerUow.actorVersion shouldBe 1
+      customerUow.reactions shouldBe Seq(
+        CustomerCreated(1, CustomerId(2)),
+        CustomerUpdated(1, CustomerId(2), "apples,bananas")
+      )
+      customerUow.startingReactionRank shouldBe 1L
+
+      val basketUow = uows1(1)
+      basketUow.key shouldBe ActorKey(BasketId(2), classOf[Basket])
+      basketUow.actorVersion shouldBe 1
+      basketUow.reactions shouldBe Seq(
+        BasketCreated(1, BasketId(2)),
+        BasketUpdated(1, BasketId(2), "apples,bananas")
+      )
+      basketUow.startingReactionRank shouldBe customerUow.endingReactionRank + 1
+      
+      direct.put(AddItemsForCustomer(2, List(2), "oranges"))
       val uows2 = awaitUows(disp, uows1.last.endingReactionRank + 1)
+      uows2.size should be(2)
       assert(uows1.nonEmpty)
       assert(uows1.forall(_.startingReactionRank >= 1))
       assert(uows2.nonEmpty)

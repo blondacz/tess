@@ -10,7 +10,7 @@ case class ListBasket(cid: Long, basketIds: List[Long]) extends Message
 
 case object ClearBasket extends Command
 
-case class CustomerCreated(cid: Long, customerId: CustomerId, initialItemsCsv: String) extends Event
+case class CustomerCreated(cid: Long, customerId: CustomerId) extends Event
 case class CustomerUpdated(cid: Long, customerId: CustomerId, itemsCsv: String) extends Event
 case class BasketCleared(basketId: BasketId, items: List[String]) extends Event
 
@@ -23,10 +23,10 @@ object CustomerFactory extends ActorFactory[CustomerId,Customer]() {
     case AddItemsForCustomer(_, ids, _) => ids.map(CustomerId(_))
   }
   override def receive(id: CustomerId): PartialFunction[Message, Event] = {
-    case AddItemsForCustomer(cid, _, items) => CustomerCreated(cid, id, items)
+    case AddItemsForCustomer(cid, _, items) => CustomerCreated(cid, id)
   }
   override def create(id: CustomerId): PartialFunction[Event, Customer] = {
-    case CustomerCreated(_, _, _) => Customer(id, cid = 0) // state populated by events
+    case CustomerCreated(_, _) => Customer(id, cid = 0) // state populated by events
   }
 }
 

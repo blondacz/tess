@@ -30,7 +30,7 @@ class RocksDbEventStoreSpec extends AnyFunSuite {
       val uow1 = ActorUnitOfWork(
         key = key,
         actorVersion = 1,
-        reactions = Seq(CustomerCreated(1, CustomerId(1), "apples")),
+        reactions = Seq(CustomerCreated(1, CustomerId(1))),
         startingReactionRank = 1
       )
 

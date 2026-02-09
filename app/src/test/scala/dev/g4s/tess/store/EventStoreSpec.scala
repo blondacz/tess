@@ -39,7 +39,7 @@ class EventStoreSpec extends AnyFunSuite {
         val uow1 = ActorUnitOfWork(
           key = key,
           actorVersion = 1,
-          reactions = Seq(CustomerCreated(1, CustomerId(1), "apples")),
+          reactions = Seq(CustomerCreated(1, CustomerId(1))),
           startingReactionRank = 1
         )
 
@@ -68,8 +68,8 @@ class EventStoreSpec extends AnyFunSuite {
         val keyA = ActorKey(CustomerId(10), classOf[Customer])
         val keyB = ActorKey(CustomerId(20), classOf[Customer])
 
-        val a1 = ActorUnitOfWork(keyA, actorVersion = 1, Seq(CustomerCreated(1, CustomerId(10), "A")), startingReactionRank = 1)
-        val b1 = ActorUnitOfWork(keyB, actorVersion = 1, Seq(CustomerCreated(2, CustomerId(20), "B")), startingReactionRank = 5)
+        val a1 = ActorUnitOfWork(keyA, actorVersion = 1, Seq(CustomerCreated(1, CustomerId(10))), startingReactionRank = 1)
+        val b1 = ActorUnitOfWork(keyB, actorVersion = 1, Seq(CustomerCreated(2, CustomerId(20))), startingReactionRank = 5)
 
         store.store(a1).fold(fail(_), identity)
         store.store(b1).fold(fail(_), identity)
