@@ -2,8 +2,9 @@ package dev.g4s.tess.app
 
 import dev.g4s.tess.TessConfig.DispatcherFactory
 import dev.g4s.tess.{Tess, TessConfig}
+import dev.g4s.tess.TessConfig.Resource
 import dev.g4s.tess.coordinator.{Dispatcher, MemorizingDispatcher, NotificationDispatcher}
-import dev.g4s.tess.core.{ActorUnitOfWork, Notification}
+import dev.g4s.tess.core.{ActorUnitOfWork, Notification, TraceContext}
 import dev.g4s.tess.domain.{AddItemsForCustomer, BasketFactory, BasketId, ClearBasket, CustomerFactory, ListBasket}
 import dev.g4s.tess.input.DirectInput
 import dev.g4s.tess.store.{InMemoryEventStore, RocksDbEventStore}
@@ -11,35 +12,39 @@ import dev.g4s.tess.syntax.all.*
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
+object TessDemo extends TessApp {
+  private val memorizingDispatcher = new MemorizingDispatcher()
+  //  private val dispatcherFactory = () => new NotificationDispatcher(new MemorizingDispatcher())
+  private val dispatcherFactory : DispatcherFactory[List[ActorUnitOfWork]] = () => new PrintingDispatcher(memorizingDispatcher)
+  private var directInput: DirectInput = null
 
-object TessDemo {
-//  private val dispatcherFactory = () => new NotificationDispatcher(new MemorizingDispatcher())
-  private val dispatcherFactory : DispatcherFactory[List[ActorUnitOfWork]] = () => new PrintingDispatcher(new MemorizingDispatcher())
+  /** Wire the app as a Resource-backed Tess instance. */
+  override def run: Resource[Tess[Dispatcher { type ReplayType = List[ActorUnitOfWork] }]] =
+    Resource(
+      () => {
+        val tess = Tess
+          .builder
+          .withActorFactories(CustomerFactory, BasketFactory)
+          .withEventStore(Resource.apply(() => new InMemoryEventStore()))
+          .withInputSource { iq => directInput = new DirectInput(iq.input); directInput }
+          .withDispatcher(dispatcherFactory)
+          .build()
 
+        // queue demo messages before start (will drain once runtime starts)
+        primeDemoMessages()
+        tess
+      },
+      _.stop()
+    )
 
-  def main(args: Array[String]): Unit = {
-    var di : DirectInput = null
-    val es = Tess
-      .builder
-      .withActorFactories(CustomerFactory, BasketFactory)
-      .withEventStore(() => new RocksDbEventStore("roxsdb","g1"))
-      .withInputSource{iq => di = new DirectInput(iq.input);di}
-      .withDispatcher(dispatcherFactory)
-      .build()
-
-    es.startInputs()
-
-    println("Running..")
-    di.put(AddItemsForCustomer(1,List(2,3), "apples,bananas"))
-    di.put(AddItemsForCustomer(2,List(2,3), "oranges"))
-    di.put(AddItemsForCustomer(3,List(2,3), "grapes"))
-
-    di.put(ListBasket(4, List(2,3)))
-    di.put(ClearBasket.to(BasketId(3)))
-    di.put(ListBasket(4, List(2,3)))
-    println("Done.")
-    es.stopInputs()
-
+  private def primeDemoMessages(): Unit = {
+    println("Queueing demo workload...")
+    directInput.put(AddItemsForCustomer(1,List(2,3), "apples,bananas"), TraceContext(Map("cid" -> "1")))
+    directInput.put(AddItemsForCustomer(2,List(2,3), "oranges"), TraceContext(Map("cid" -> "2")))
+    directInput.put(AddItemsForCustomer(3,List(2,3), "grapes"), TraceContext(Map("cid" -> "3")))
+    directInput.put(ListBasket(4, List(2,3)),TraceContext(Map("cid" -> "4")))
+    directInput.put(ClearBasket.to(BasketId(3)),TraceContext(Map("cid" -> "5")))
+    directInput.put(ListBasket(4, List(2,3)),TraceContext(Map("cid" -> "6")))
   }
 
   class PrintingDispatcher[A <: Dispatcher {type ReplayType = List[ActorUnitOfWork]}](val d: A) extends Dispatcher {

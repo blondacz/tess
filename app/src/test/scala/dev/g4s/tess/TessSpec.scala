@@ -20,7 +20,7 @@ class TessSpec extends AnyFunSuite with Matchers {
       .withDispatcher(() => disp)
       .withInputSource{iq => direct = new DirectInput(iq.input);direct}
       .build()
-    es.startInputs()
+      .start()
     try {
       val traceContext = new TraceContext(Map("tkey" -> "tval"))
       direct.put(AddItemsForCustomer(1, List(2), "apples,bananas"), traceContext)
@@ -56,7 +56,7 @@ class TessSpec extends AnyFunSuite with Matchers {
       val min2 = uows2.map(_.startingReactionRank).min
       assert(min2 == max1 + 1)
       assert(uows2.map(_.endingReactionRank).max > uows1.last.endingReactionRank)
-    } finally es.stopInputs()
+    } finally es.stop()
   }
 
   test("Basket should be updated based on Customer events and can be listed directly") {
@@ -67,7 +67,7 @@ class TessSpec extends AnyFunSuite with Matchers {
       .withDispatcher(() => disp)
       .withInputSource{iq => direct = new DirectInput(iq.input);direct}
       .build()
-    es.startInputs()
+      .start()
     try {
       val id = 5L
       direct.put(AddItemsForCustomer(10, List(id), "milk,bread"))
@@ -82,7 +82,7 @@ class TessSpec extends AnyFunSuite with Matchers {
       val basketList = awaitUows(disp, uows.last.endingReactionRank + 1)
       val basketListEvents = basketList.flatMap(_.reactions).collect { case e: BasketListed => e }
       assert(basketListEvents.exists(_.itemsCsv.contains("milk")))
-    } finally es.stopInputs()
+    } finally es.stop()
   }
 
   test("Commands are routed directly to target actors") {
@@ -93,7 +93,7 @@ class TessSpec extends AnyFunSuite with Matchers {
       .withDispatcher(() => disp)
       .withInputSource{iq => direct = new DirectInput(iq.input);direct}
       .build()
-    es.startInputs()
+      .start()
     try {
       val basketId = 8L
       direct.put(AddItemsForCustomer(1, List(basketId), "coffee")) // ensure basket exists
@@ -102,7 +102,7 @@ class TessSpec extends AnyFunSuite with Matchers {
       val uows = awaitUows(disp, uowsCreate.last.endingReactionRank + 1)
       val basketCleared = uows.flatMap(_.events).collect { case e: BasketCleared if e.basketId.id == basketId => e }
       assert(basketCleared.nonEmpty)
-    } finally es.stopInputs()
+    } finally es.stop()
   }
 
   private def awaitUows(d: MemorizingDispatcher, from: Long, timeout: FiniteDuration = 5.seconds, poll: FiniteDuration = 50.millis) = {
