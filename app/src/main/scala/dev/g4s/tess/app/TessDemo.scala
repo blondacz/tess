@@ -49,6 +49,7 @@ object TessDemo extends TessApp {
 
   class PrintingDispatcher[A <: Dispatcher {type ReplayType = List[ActorUnitOfWork]}](val d: A) extends Dispatcher {
     override type ReplayType = d.ReplayType
+    private var nextFrom: Long = 1L
 
     def dispatch(unitOfWork: ActorUnitOfWork): Unit = d.dispatch(unitOfWork)
 
@@ -56,7 +57,9 @@ object TessDemo extends TessApp {
 
     def commit(reactionRank: Long): Unit = {
       d.commit(reactionRank)
-      printResult(d.replay(reactionRank))
+      val from = nextFrom
+      nextFrom = reactionRank + 1
+      printResult(d.replay(from))
     }
 
     private def printResult(uows: List[ActorUnitOfWork]): Unit = {
