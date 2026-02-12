@@ -7,7 +7,7 @@ import scala.annotation.tailrec
 import scala.util.Try
 
 /** Encapsulates message traversal and reaction replay for Tess. */
-final class TessReactor[D <: Dispatcher](
+final class Traversal[D <: Dispatcher](
     messageHandlers: Seq[MessageHandler],
     coordinator: Coordinator,
     val dispatcher: D

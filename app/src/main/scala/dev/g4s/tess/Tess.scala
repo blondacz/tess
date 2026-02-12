@@ -16,7 +16,7 @@ class Tess[D <: Dispatcher](
 ) {
   private val coordinator: Coordinator = new SimpleCoordinator(eventStore, dispatcher)
   private val messageHandlers = actorFactories.map(af => new MessageHandler(af, coordinator))
-  private val reactor = new TessReactor[D](messageHandlers, coordinator, dispatcher)
+  private val reactor = new Traversal[D](messageHandlers, coordinator, dispatcher)
   private val queues: InputQueues = InputQueues(inputSettings.adminCapacity, inputSettings.busCapacity, inputSettings.inputCapacity)
   private val router = new InputRouter[reactor.Replay](
     reactor.processEnvelope,
